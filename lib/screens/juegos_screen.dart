@@ -17,15 +17,16 @@ class JuegosScreen extends StatelessWidget {
         title: Text('JUEGOS', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 12)),
         backgroundColor: PixBarColors.background,
         iconTheme: const IconThemeData(color: PixBarColors.grey2),
-        actions: [
-          TextButton(
-            onPressed: () {
-              context.read<BleService>().cmd(PixBarCmd.btnMode);
-              Navigator.of(context).popUntil((r) => r.isFirst);
-            },
-            child: Text('MENÚ', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 11)),
-          ),
-        ],
+  //se elimina boton MENU a la derecha arriba de cada pantalla
+  //      actions: [
+  //       TextButton(
+  //          onPressed: () {
+  //            context.read<BleService>().cmd(PixBarCmd.btnMode);
+  //            Navigator.of(context).popUntil((r) => r.isFirst);
+  //          },
+  //          child: Text('MENÚ', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 11)),
+  //        ),
+  //      ],
       ),
       body: GridView.builder(
         padding: const EdgeInsets.all(12),

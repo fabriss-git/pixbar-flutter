@@ -37,16 +37,17 @@ class _LuzScreenState extends State<LuzScreen> {
           style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 12)),
         backgroundColor: PixBarColors.background,
         iconTheme: const IconThemeData(color: PixBarColors.grey2),
-        actions: [
-          TextButton(
-            onPressed: () {
-              ble.cmd(PixBarCmd.btnMode);
-              Navigator.of(context).popUntil((r) => r.isFirst);
-            },
-            child: Text('MENÚ',
-              style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 11)),
-          ),
-        ],
+//se elimina boton MENU arriba a la derecha en las pantallas
+//        actions: [
+//          TextButton(
+//            onPressed: () {
+//              ble.cmd(PixBarCmd.btnMode);
+//              Navigator.of(context).popUntil((r) => r.isFirst);
+//            },
+//            child: Text('MENÚ',
+//              style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 11)),
+//          ),
+//        ],
       ),
       body: Column(
         children: [

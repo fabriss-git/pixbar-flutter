@@ -24,15 +24,16 @@ class _EfectosScreenState extends State<EfectosScreen> {
         title: Text('EFECTOS', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 12)),
         backgroundColor: PixBarColors.background,
         iconTheme: const IconThemeData(color: PixBarColors.grey2),
-        actions: [
-          TextButton(
-            onPressed: () {
-              ble.cmd(PixBarCmd.btnMode);
-              Navigator.of(context).popUntil((r) => r.isFirst);
-            },
-            child: Text('MENÚ', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 11)),
-          ),
-        ],
+//se elimina boton MENU arriba a la derecha en cada pantalla
+//        actions: [
+//          TextButton(
+//            onPressed: () {
+//              ble.cmd(PixBarCmd.btnMode);
+//              Navigator.of(context).popUntil((r) => r.isFirst);
+//            },
+//            child: Text('MENÚ', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 11)),
+//          ),
+//        ],
       ),
       body: Column(
         children: [

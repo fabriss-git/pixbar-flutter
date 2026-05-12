@@ -144,10 +144,10 @@ class BleService extends ChangeNotifier {
   void _onDisconnect() {
     _connected = false;
     _cmdChar = null; _stateChar = null;
-    _stateSub?.cancel(); _connSub?.cancel();
-    _log = 'Desconectado';
+    _stateSub?.cancel();
+    // NO cancelar _connSub — seguimos escuchando connectionState
+    _log = 'Desconectado — reconectando...';
     notifyListeners();
-    // Reconexión automática si no fue intencional
     if (!_intentionalDisconnect && _device != null) {
       _autoReconnect();
     }
@@ -155,14 +155,62 @@ class BleService extends ChangeNotifier {
   }
 
   Future<void> _autoReconnect() async {
-    // Reintentar indefinidamente mientras la app esté abierta
+    // Escuchar connectionState — cuando Android reconecta solo, redescubrir servicios
+    // También intentar connect() periódicamente para ayudar a Android
     while (!_connected && _device != null && !_intentionalDisconnect) {
-      await Future.delayed(const Duration(seconds: 3));
-      if (_device == null || _intentionalDisconnect) break;
+      await Future.delayed(const Duration(seconds: 4));
+      if (_device == null || _intentionalDisconnect || _connected) break;
       try {
-        await connect(_device!);
-        if (_connected) return;
-      } catch (_) {}
+        // Intentar conectar — si ya está conectado a nivel GATT, solo redescubre servicios
+        await _device!.connect();
+        // Si llegamos acá sin excepción, redescubrir servicios
+        final services = await _device!.discoverServices();
+        for (final svc in services) {
+          if (svc.uuid.toString().toLowerCase().contains('9abc')) {
+            for (final char in svc.characteristics) {
+              final uuid = char.uuid.toString().toLowerCase();
+              if (uuid.contains('9ab1')) {
+                _stateChar = char;
+                await char.setNotifyValue(true);
+                _stateSub?.cancel();
+                _stateSub = char.onValueReceived.listen(_onStateReceived);
+              }
+              if (uuid.contains('9ab2')) _cmdChar = char;
+            }
+          }
+        }
+        _connected = true;
+        _log = 'Reconectado ✓';
+        notifyListeners();
+        return;
+      } catch (e) {
+        final msg = e.toString();
+        if (msg.contains('already connected')) {
+          // GATT sigue abierto — solo redescubrir servicios
+          try {
+            final services = await _device!.discoverServices();
+            for (final svc in services) {
+              if (svc.uuid.toString().toLowerCase().contains('9abc')) {
+                for (final char in svc.characteristics) {
+                  final uuid = char.uuid.toString().toLowerCase();
+                  if (uuid.contains('9ab1')) {
+                    _stateChar = char;
+                    await char.setNotifyValue(true);
+                    _stateSub?.cancel();
+                    _stateSub = char.onValueReceived.listen(_onStateReceived);
+                  }
+                  if (uuid.contains('9ab2')) _cmdChar = char;
+                }
+              }
+            }
+            _connected = true;
+            _log = 'Reconectado ✓';
+            notifyListeners();
+            return;
+          } catch (_) {}
+        }
+        // Cualquier otro error — seguir intentando
+      }
     }
   }
 
