@@ -2,7 +2,7 @@ import 'dart:async';
 import '../services/commands.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/ble_service.dart';
+import '../services/ble_manager.dart';
 import '../theme/app_theme.dart';
 import 'juegos_screen.dart';
 
@@ -32,10 +32,10 @@ class CtrlScreen extends StatelessWidget {
 //        ],
 
 actions: [
-          Selector<BleService, bool>(
-            selector: (_, ble) => ble.state.mute,
+          Selector<BleManager, bool>(
+            selector: (_, m) => m.activeState.mute,
             builder: (_, muted, __) => IconButton(
-              onPressed: () => context.read<BleService>().cmd(PixBarCmd.mute),
+              onPressed: () => context.read<BleManager>().activeTarget?.cmd(PixBarCmd.mute),
               icon: Text(
                 muted ? '🔇' : '🔊',
                 style: const TextStyle(fontSize: 18),
@@ -44,7 +44,7 @@ actions: [
           ),
           TextButton(
             onPressed: () {
-              context.read<BleService>().cmd(5);
+              context.read<BleManager>().activeTarget?.cmd(5);
               Navigator.of(context).popUntil((r) => r.isFirst);
             },
             child: Text('MENÚ', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 11)),
@@ -54,8 +54,8 @@ actions: [
       body: Column(
         children: [
           // Info
-          Selector<BleService, PixBarState>(
-            selector: (_, ble) => ble.state,
+          Selector<BleManager, PixBarState>(
+            selector: (_, m) => m.activeState,
             builder: (_, state, __) => _InfoRow(state: state),
           ),
           // Controles
@@ -177,11 +177,13 @@ class _CtrlBtnState extends State<_CtrlBtn> {
   };
 
   void _start() {
-    final ble = context.read<BleService>();
-    ble.cmd(widget.btn.byte);
+    //final ble = context.read<BleService>();
+    //ble.cmd(widget.btn.byte);
+    context.read<BleManager>().activeTarget?.cmd(widget.btn.byte);
     if (widget.btn.hold) {
       _timer = Timer.periodic(const Duration(milliseconds: 90), (_) {
-        ble.cmd(widget.btn.byte);
+        //ble.cmd(widget.btn.byte);
+        context.read<BleManager>().activeTarget?.cmd(widget.btn.byte);
       });
     }
     setState(() => _held = true);

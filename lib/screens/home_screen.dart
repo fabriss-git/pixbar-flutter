@@ -1,10 +1,10 @@
-import 'scan_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/ble_service.dart';
+import '../services/ble_manager.dart';
 import '../services/commands.dart';
 import '../theme/app_theme.dart';
 import '../widgets/logo_widget.dart';
+import 'devices_screen.dart';
 import 'juegos_screen.dart';
 import 'luz_screen.dart';
 import 'efectos_screen.dart';
@@ -15,57 +15,24 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ble = context.watch<BleService>();
-    final apagado = ble.state.modo == 15;
+    final mgr = context.watch<BleManager>();
+    final target = mgr.activeTarget;
+    final state = mgr.activeState;
+    final apagado = state.modo == 15;
+    final esGrupo = mgr.activeTarget is GroupTarget;
+
     return Scaffold(
       backgroundColor: PixBarColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            _Header(
-              connected: ble.connected,
-              muted: ble.state.mute,
-              onDisconnect: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    backgroundColor: PixBarColors.panel,
-                    title: Text('Desconectar', style: PixBarText.display.copyWith(fontSize: 16)),
-                    content: Text('¿Desconectar el PixBar?',
-                      style: PixBarText.mono.copyWith(fontSize: 12)),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: Text('CANCELAR', style: PixBarText.mono.copyWith(color: PixBarColors.grey)),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: Text('DESCONECTAR', style: PixBarText.mono.copyWith(color: PixBarColors.magenta)),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirm == true) {
-                  await ble.disconnect();
-                  if (context.mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const ScanScreen()),
-                      (route) => false,
-                    );
-                  }
-                }
-              },
-              onMute: () => ble.cmd(PixBarCmd.mute),
-            ),
-
-            _InfoStrip(state: ble.state),
-
+            _Header(mgr: mgr),
+            _InfoStrip(state: state),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // Grilla 2x2 — grisada cuando apagado
                     Opacity(
                       opacity: apagado ? 0.3 : 1.0,
                       child: IgnorePointer(
@@ -77,38 +44,51 @@ class HomeScreen extends StatelessWidget {
                           crossAxisSpacing: 10,
                           mainAxisSpacing: 10,
                           children: [
-                            _ModoBtn(
-                              label: 'JUEGOS', icon: '🕹️',
-                              color: const Color(0xFFFF2D78),
-                              bgColor: const Color(0xFF1A0A12),
-                              borderColor: const Color(0x44FF2D78),
-                              onTap: () => Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => const JuegosScreen())),
-                            ),
+
+
+                            //_ModoBtn(
+                            //  label: 'JUEGOS', icon: '🕹️',
+                            //  color: const Color(0xFFFF2D78),
+                            //  bgColor: const Color(0xFF1A0A12),
+                            //  borderColor: const Color(0x44FF2D78),
+                            //  onTap: () => Navigator.push(context,
+                            //    MaterialPageRoute(builder: (_) => const JuegosScreen()))),
+                            
+                            Opacity(
+      opacity: (apagado || esGrupo) ? 0.3 : 1.0,
+      child: IgnorePointer(
+        ignoring: apagado || esGrupo,
+        child: _ModoBtn(
+          label: 'JUEGOS', icon: '🕹️',
+          color: const Color(0xFFFF2D78),
+          bgColor: const Color(0xFF1A0A12),
+          borderColor: const Color(0x44FF2D78),
+          onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const JuegosScreen()))),
+                ),
+    ),
+                            
                             _ModoBtn(
                               label: 'LUZ AMB', icon: '💡',
                               color: const Color(0xFFFFE600),
                               bgColor: const Color(0xFF12110A),
                               borderColor: const Color(0x44FFE600),
-                              onTap: () => Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => const LuzScreen())),
-                            ),
+                              onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const LuzScreen()))),
                             _ModoBtn(
                               label: 'EFECTOS', icon: '✨',
                               color: const Color(0xFF39FF14),
                               bgColor: const Color(0xFF0A120A),
                               borderColor: const Color(0x4439FF14),
-                              onTap: () => Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => EfectosScreen())),
-                            ),
+                              onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const EfectosScreen()))),
                             _ModoBtn(
                               label: 'VÚMETRO', icon: '🎵',
                               color: PixBarColors.cyan,
                               bgColor: const Color(0xFF0A0F18),
                               borderColor: const Color(0x4400E5FF),
-                              onTap: () => Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => VuScreen())),
-                            ),
+                              onTap: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const VuScreen()))),
                           ],
                         ),
                       ),
@@ -116,51 +96,48 @@ class HomeScreen extends StatelessWidget {
 
                     const SizedBox(height: 10),
 
-                    // FIESTA — grisado cuando apagado
                     Opacity(
                       opacity: apagado ? 0.3 : 1.0,
                       child: IgnorePointer(
                         ignoring: apagado,
-                        child: _FiestaBtn(onTap: () => ble.cmd(PixBarCmd.fiesta)),
+                        child: _FiestaBtn(
+                          onTap: () => target?.cmd(PixBarCmd.fiesta)),
                       ),
                     ),
 
                     const SizedBox(height: 10),
 
-// APAGAR / ENCENDER
-Center(
-  child: GestureDetector(
-    onTap: () => ble.cmd(apagado ? PixBarCmd.continuar : PixBarCmd.apagar),
-    child: Container(
-      width: 64, height: 64,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: apagado ? const Color(0xFF0A1A0A) : const Color(0xFF1A0A0A),
-        border: Border.all(
-          color: apagado
-            ? PixBarColors.green.withAlpha(150)
-            : PixBarColors.magenta.withAlpha(150),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: apagado
-              ? PixBarColors.green.withAlpha(60)
-              : PixBarColors.magenta.withAlpha(60),
-            blurRadius: 12,
-          ),
-        ],
-      ),
-      child: Icon(
-        Icons.power_settings_new,
-        size: 32,
-        color: apagado ? PixBarColors.green : PixBarColors.magenta,
-      ),
-    ),
-  ),
-),
-
-
+                    Center(
+                      child: GestureDetector(
+                        onTap: () => target?.cmd(
+                          apagado ? PixBarCmd.continuar : PixBarCmd.apagar),
+                        child: Container(
+                          width: 64, height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: apagado
+                              ? const Color(0xFF0A1A0A)
+                              : const Color(0xFF1A0A0A),
+                            border: Border.all(
+                              color: apagado
+                                ? PixBarColors.green.withAlpha(150)
+                                : PixBarColors.magenta.withAlpha(150),
+                              width: 2,
+                            ),
+                            boxShadow: [BoxShadow(
+                              color: apagado
+                                ? PixBarColors.green.withAlpha(60)
+                                : PixBarColors.magenta.withAlpha(60),
+                              blurRadius: 12,
+                            )],
+                          ),
+                          child: Icon(
+                            Icons.power_settings_new, size: 32,
+                            color: apagado ? PixBarColors.green : PixBarColors.magenta,
+                          ),
+                        ),
+                      ),
+                    ),
 
                     const SizedBox(height: 16),
                   ],
@@ -168,7 +145,7 @@ Center(
               ),
             ),
 
-            _BrilloBar(ble: ble),
+            _BrilloBar(mgr: mgr),
           ],
         ),
       ),
@@ -176,16 +153,17 @@ Center(
   }
 }
 
+// ── Header ──
 class _Header extends StatelessWidget {
-  final bool connected, muted;
-  final VoidCallback onDisconnect, onMute;
-  const _Header({
-    required this.connected, required this.muted,
-    required this.onDisconnect, required this.onMute,
-  });
+  final BleManager mgr;
+  const _Header({required this.mgr});
 
   @override
   Widget build(BuildContext context) {
+    final target = mgr.activeTarget;
+    final state = mgr.activeState;
+    final muted = state.mute;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
@@ -195,14 +173,17 @@ class _Header extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const PixBarLogo(size: 'small'),
+
+          // Mute
           GestureDetector(
-            onTap: onMute,
+            onTap: () => target?.cmd(PixBarCmd.mute),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: muted ? const Color(0xFF1A0A0A) : PixBarColors.panel2,
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: muted ? PixBarColors.magenta : PixBarColors.border),
+                border: Border.all(
+                  color: muted ? PixBarColors.magenta : PixBarColors.border),
               ),
               child: Row(children: [
                 Text(muted ? '🔇' : '🔊', style: const TextStyle(fontSize: 12)),
@@ -210,17 +191,22 @@ class _Header extends StatelessWidget {
                 Text(muted ? 'UNMUTE' : 'MUTE',
                   style: PixBarText.mono.copyWith(
                     fontSize: 9,
-                    color: muted ? PixBarColors.magenta : PixBarColors.grey2,
-                  )),
+                    color: muted ? PixBarColors.magenta : PixBarColors.grey2)),
               ]),
             ),
           ),
+
+          // Botón de dispositivos — muestra el nombre del target activo
           GestureDetector(
-            onTap: onDisconnect,
+            onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const DevicesScreen())),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                border: Border.all(color: connected ? const Color(0x44FF2D78) : PixBarColors.border),
+                border: Border.all(
+                  color: mgr.anyConnected
+                    ? const Color(0x4400E5FF)
+                    : PixBarColors.border),
                 borderRadius: BorderRadius.circular(6),
                 color: PixBarColors.panel2,
               ),
@@ -229,15 +215,22 @@ class _Header extends StatelessWidget {
                   width: 7, height: 7,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: connected ? PixBarColors.green : const Color(0xFF333333),
-                    boxShadow: connected ? [
+                    color: mgr.anyConnected
+                      ? PixBarColors.green
+                      : const Color(0xFF333333),
+                    boxShadow: mgr.anyConnected ? [
                       BoxShadow(color: PixBarColors.green.withAlpha(150), blurRadius: 6)
                     ] : null,
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text(connected ? 'Conectado' : 'Desconectado',
-                  style: PixBarText.mono.copyWith(fontSize: 10)),
+                Text(
+                  target?.displayName ?? 'Sin conexión',
+                  style: PixBarText.mono.copyWith(fontSize: 10),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.expand_more, size: 14, color: PixBarColors.grey),
               ]),
             ),
           ),
@@ -247,6 +240,7 @@ class _Header extends StatelessWidget {
   }
 }
 
+// ── InfoStrip ──
 class _InfoStrip extends StatelessWidget {
   final PixBarState state;
   const _InfoStrip({required this.state});
@@ -329,8 +323,8 @@ class _ModoBtn extends StatelessWidget {
 }
 
 class _FiestaBtn extends StatelessWidget {
-  final VoidCallback onTap;
-  const _FiestaBtn({required this.onTap});
+  final VoidCallback? onTap;
+  const _FiestaBtn({this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -354,8 +348,8 @@ class _FiestaBtn extends StatelessWidget {
 }
 
 class _BrilloBar extends StatefulWidget {
-  final BleService ble;
-  const _BrilloBar({required this.ble});
+  final BleManager mgr;
+  const _BrilloBar({required this.mgr});
 
   @override
   State<_BrilloBar> createState() => _BrilloBarState();
@@ -387,7 +381,7 @@ class _BrilloBarState extends State<_BrilloBar> {
             child: Slider(
               value: _valor, min: 0, max: 1,
               onChanged: (v) => setState(() => _valor = v),
-              onChangeEnd: (v) => widget.ble.setBrillo(v),
+              onChangeEnd: (v) => widget.mgr.activeTarget?.setBrillo(v),
             ),
           ),
         ),

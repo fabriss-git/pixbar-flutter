@@ -123,6 +123,7 @@ bool operator ==(Object other) =>
   other.score == score &&
   other.vidas == vidas &&
   other.mute == mute&&
+  other.vuColor == vuColor &&
   other.efxParam == efxParam;
 
 @override

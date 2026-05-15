@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/ble_service.dart';
+import '../services/ble_manager.dart';
 import '../services/commands.dart';
 import '../theme/app_theme.dart';
 import 'ctrl_screen.dart';
@@ -58,7 +58,7 @@ class _JuegoCard extends StatelessWidget {
         if (juego.tiene2J) {
           _mostrarSelector2J(context);
         } else {
-          context.read<BleService>().cmd(PixBarCmd.juego(index));
+          context.read<BleManager>().activeTarget?.cmd(PixBarCmd.juego(index));
           Navigator.push(context, MaterialPageRoute(
             builder: (_) => CtrlScreen(juego: juego, index: index, dosJ: false),
           ));
@@ -102,7 +102,7 @@ class _JuegoCard extends StatelessWidget {
   }
 
   void _mostrarSelector2J(BuildContext context) {
-    final ble = context.read<BleService>();
+    final target = context.read<BleManager>().activeTarget;
     showModalBottomSheet(
       context: context,
       backgroundColor: PixBarColors.panel,
@@ -122,7 +122,7 @@ class _JuegoCard extends StatelessWidget {
                   label: '1 JUGADOR', icon: '👤',
                   color: PixBarColors.green,
                   onTap: () {
-                    ble.cmd(PixBarCmd.juego(index));
+                    target?.cmd(PixBarCmd.juego(index));
                     Navigator.pop(context);
                     Navigator.push(context, MaterialPageRoute(
                       builder: (_) => CtrlScreen(juego: juego, index: index, dosJ: false),
@@ -136,7 +136,7 @@ class _JuegoCard extends StatelessWidget {
                   label: '2 JUGADORES', icon: '👥',
                   color: PixBarColors.cyan,
                   onTap: () {
-                    ble.cmd(index == 5 ? PixBarCmd.pong2J : PixBarCmd.pixCapture2J);
+                    target?.cmd(index == 5 ? PixBarCmd.pong2J : PixBarCmd.pixCapture2J);
                     Navigator.pop(context);
                     Navigator.push(context, MaterialPageRoute(
                       builder: (_) => CtrlScreen(juego: juego, index: index, dosJ: true),

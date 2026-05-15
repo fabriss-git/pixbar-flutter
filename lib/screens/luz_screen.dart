@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/ble_service.dart';
+import '../services/ble_manager.dart';
 import '../services/commands.dart';
 import '../theme/app_theme.dart';
 
@@ -29,7 +29,7 @@ class _LuzScreenState extends State<LuzScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ble = context.read<BleService>();
+    final target = context.read<BleManager>().activeTarget;
     return Scaffold(
       backgroundColor: PixBarColors.background,
       appBar: AppBar(
@@ -69,7 +69,7 @@ class _LuzScreenState extends State<LuzScreen> {
                 itemBuilder: (_, i) => GestureDetector(
                   onTap: () {
                     setState(() => _selColor = i + 1);
-                    ble.cmd(PixBarCmd.color(i));
+                    target?.cmd(PixBarCmd.color(i));
                   },
                   child: Container(
                     decoration: BoxDecoration(
@@ -115,7 +115,7 @@ class _LuzScreenState extends State<LuzScreen> {
                   child: _ColorWheel(
                     onColor: (r, g, b) {
                       setState(() => _selColor = 0);
-                      ble.sendRGB(r, g, b);
+                      target?.sendRGB(r, g, b);
                     },
                   ),
                 ),
@@ -146,7 +146,7 @@ class _LuzScreenState extends State<LuzScreen> {
                     value: _brillo,
                     min: 0, max: 1,
                     onChanged: (v) => setState(() => _brillo = v),
-                    onChangeEnd: (v) => ble.setBrillo(v),
+                    onChangeEnd: (v) => target?.setBrillo(v),
                   ),
                 ),
               ),

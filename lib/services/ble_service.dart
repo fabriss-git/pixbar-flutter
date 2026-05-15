@@ -62,7 +62,7 @@ class BleService extends ChangeNotifier {
       );
       if (_scanning) {
         _scanning = false;
-        _log = 'No encontrado. Tocá CONECTAR para reintentar.';
+        _log = 'No encontrado. Tocá BUSCAR para reintentar.';
         notifyListeners();
       }
     } catch (e) {

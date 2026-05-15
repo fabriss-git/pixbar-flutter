@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/ble_service.dart';
+import '../services/ble_manager.dart';
 import '../services/commands.dart';
 import '../theme/app_theme.dart';
 
@@ -17,7 +17,7 @@ class _VuScreenState extends State<VuScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ble = context.read<BleService>();
+    final target = context.read<BleManager>().activeTarget;
     return Scaffold(
       backgroundColor: PixBarColors.background,
       appBar: AppBar(
@@ -52,7 +52,7 @@ class _VuScreenState extends State<VuScreen> {
                   onTap: () {
                     setState(() => _selVu = i);
                     //ble.cmd(PixBarCmd.vuModo(i));
-                    ble.cmd(PixBarCmd.vuModo(m.fwIndex));
+                    target?.cmd(PixBarCmd.vuModo(m.fwIndex));
                   },
                   child: Container(
                     decoration: BoxDecoration(
@@ -108,7 +108,7 @@ class _VuScreenState extends State<VuScreen> {
                   Text('COLOR', style: PixBarText.mono.copyWith(fontSize: 9, letterSpacing: 2)),
                   const SizedBox(width: 12),
                   GestureDetector(
-                    onTap: () => ble.cmd(PixBarCmd.btnVerde),
+                    onTap: () => target?.cmd(PixBarCmd.btnVerde),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
@@ -121,8 +121,8 @@ class _VuScreenState extends State<VuScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Selector<BleService, int>(
-                    selector: (_, b) => b.state.vuColor,
+                  Selector<BleManager, int>(
+                    selector: (_, m) => m.activeState.vuColor,
                     builder: (_, color, __) => Text(
                       '${color+1}/10',
                       style: PixBarText.mono.copyWith(fontSize: 11, color: PixBarColors.cyan),
@@ -130,7 +130,7 @@ class _VuScreenState extends State<VuScreen> {
                   ),
                   const SizedBox(width: 8),
                   GestureDetector(
-                    onTap: () => ble.cmd(PixBarCmd.btnAmarillo),
+                    onTap: () => target?.cmd(PixBarCmd.btnAmarillo),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
@@ -160,7 +160,7 @@ class _VuScreenState extends State<VuScreen> {
                     child: Slider(
                       value: _brillo, min: 0, max: 1,
                       onChanged: (v) => setState(() => _brillo = v),
-                      onChangeEnd: (v) => ble.setBrillo(v),
+                      onChangeEnd: (v) => target?.setBrillo(v),
                     ),
                   ),
                 ),
