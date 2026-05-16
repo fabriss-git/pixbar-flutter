@@ -67,7 +67,7 @@ class _AppRootState extends State<_AppRoot> {
     }
 
     final mgr = context.watch<BleManager>();
-    if (mgr.anyConnected) {
+    if (mgr.devices.isNotEmpty) {
       return const HomeScreen();
     } else {
       return const ScanScreen();

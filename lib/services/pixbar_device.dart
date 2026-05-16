@@ -18,6 +18,7 @@ class PixBarDevice extends ChangeNotifier {
   bool _connected = false;
   bool _intentionalDisconnect = false;
   PixBarState _state = const PixBarState();
+  bool Function()? isManagerConnecting;  // agregado 16052026
 
   // Alias editable por el usuario. Por defecto usa el nombre BT (ej: "PixBar-A3F2")
   String alias;
@@ -40,7 +41,7 @@ class PixBarDevice extends ChangeNotifier {
   Future<void> connect({int retry = 0}) async {
     try {
       //await btDevice.connect(); borrado 13052026
-      await btDevice.connect(timeout: const Duration(seconds: 5));
+      await btDevice.connect(timeout: const Duration(seconds: 15));
 
       _connSub?.cancel();
       _connSub = btDevice.connectionState.listen((s) {
@@ -68,6 +69,8 @@ class PixBarDevice extends ChangeNotifier {
 
   // ── Desconectar (intencional) ──
   Future<void> disconnect() async {
+      debugPrint('[$displayName] disconnect() llamado');
+  debugPrint(StackTrace.current.toString()); // ← ver quién lo llama
     _intentionalDisconnect = true;
     _connected = false;
     _cmdChar = null;
@@ -77,7 +80,13 @@ class PixBarDevice extends ChangeNotifier {
     try { await btDevice.disconnect(); } catch (_) {}
     notifyListeners();
   }
-
+// ── Cancelar autoreconexión temporalmente ──
+void cancelAutoReconnect() {
+  _intentionalDisconnect = true;
+  Future.delayed(const Duration(milliseconds: 100), () {
+    _intentionalDisconnect = false;
+  });
+}
   // ── Desconexión inesperada → autoreconectar ──
   void _onDisconnect() {
     _connected = false;
@@ -89,29 +98,37 @@ class PixBarDevice extends ChangeNotifier {
     _intentionalDisconnect = false;
   }
 
-  Future<void> _autoReconnect() async {
-    while (!_connected && !_intentionalDisconnect) {
-      await Future.delayed(const Duration(seconds: 4));
-      if (_intentionalDisconnect) break;
-      try {
-        //await btDevice.connect(); borrado 13052026
-        await btDevice.connect(timeout: const Duration(seconds: 5));
-        await _discoverServices();
-        _connected = true;
-        notifyListeners();
-        return;
-      } catch (e) {
-        if (e.toString().contains('already connected')) {
-          try {
-            await _discoverServices();
-            _connected = true;
-            notifyListeners();
-            return;
-          } catch (_) {}
-        }
+Future<void> _autoReconnect() async {
+  // Esperar un poco antes de empezar a intentar
+  await Future.delayed(const Duration(seconds: 2));
+  
+  while (!_connected && !_intentionalDisconnect) {
+    await Future.delayed(const Duration(seconds: 4));
+    if (_intentionalDisconnect) break;
+    
+    // Si el manager está conectando otro device, esperar más
+    while (isManagerConnecting?.call() == true) {
+      await Future.delayed(const Duration(seconds: 2));
+    }
+    
+    try {
+      await btDevice.connect(timeout: const Duration(seconds: 8));
+      await _discoverServices();
+      _connected = true;
+      notifyListeners();
+      return;
+    } catch (e) {
+      if (e.toString().contains('already connected')) {
+        try {
+          await _discoverServices();
+          _connected = true;
+          notifyListeners();
+          return;
+        } catch (_) {}
       }
     }
   }
+}
 
   // ── Descubrir servicios y características ──
   Future<void> _discoverServices() async {

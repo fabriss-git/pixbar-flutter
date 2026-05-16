@@ -28,15 +28,17 @@ class _ScanScreenState extends State<ScanScreen> {
     final mgr = context.watch<BleManager>();
 
     // Si ya conectó alguno, ir a Home
-    if (mgr.anyConnected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
-        }
-      });
+//if (mgr.anyConnected || mgr.devices.isNotEmpty) {
+  if (mgr.anyConnected || mgr.devices.isNotEmpty) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
     }
+  });
+}
+
 
 return Stack(
   children: [
@@ -98,11 +100,6 @@ return Stack(
                         result: result,
 onConnect: () async {
   await mgr.connectScanResult(result);
-  if (mgr.anyConnected && mounted) {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
-  }
 },
                       );
                     }).toList(),

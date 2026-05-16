@@ -74,6 +74,8 @@ class BleManager extends ChangeNotifier {
   final List<ScanResult> _scanResults = [];
   StreamSubscription? _scanSub;
 
+  bool _isConnecting = false; 
+
   // ── Target activo (device o grupo que se está controlando) ──
   PixBarTarget? _activeTarget;
 
@@ -117,6 +119,7 @@ class BleManager extends ChangeNotifier {
         final alias = map['alias'] as String? ?? '';
         final btDev = BluetoothDevice.fromId(id);
         final dev = PixBarDevice(btDevice: btDev, alias: alias);
+        dev.isManagerConnecting = () => _isConnecting; 
         dev.addListener(notifyListeners); // propagar cambios al árbol
         devices.add(dev);
       }
@@ -162,7 +165,11 @@ class BleManager extends ChangeNotifier {
 
   // ── Reconectar todos los devices conocidos en paralelo ──
   Future<void> _reconnectAll() async {
-    await Future.wait(devices.map((d) => d.connect()));
+    //await Future.wait(devices.map((d) => d.connect()));
+      for (final d in devices) {
+    await d.connect();
+    if (d.connected) await Future.delayed(const Duration(milliseconds: 500));
+  }
     // Restaurar target activo
     if (_pendingActiveId != null) {
       _restoreActiveTarget(_pendingActiveId!);
@@ -253,29 +260,45 @@ _scanSub = FlutterBluePlus.scanResults.listen((results) {
 
   // ── Conectar un device encontrado en el scan ──
 Future<PixBarDevice> connectScanResult(ScanResult result) async {
+  _isConnecting = true; 
+  // Detener scan antes de conectar
+  stopScan();
+
+
+  await Future.delayed(const Duration(seconds: 2)); //antes milliseconds: 300
+
   var dev = devices.where((d) => d.id == result.device.remoteId.str).firstOrNull;
-  debugPrint('connectScanResult: dev existente=${dev?.alias} id=${result.device.remoteId.str}');
   if (dev == null) {
-    // Construir nombre: advName > platName > PixBar-XXXX desde MAC
     final advName = result.advertisementData.advName;
     final platName = result.device.platformName;
     final mac = result.device.remoteId.str;
+    final macClean = mac.replaceAll(':', '');
     final alias = advName.isNotEmpty
         ? advName
         : platName.isNotEmpty
             ? platName
-            : 'PixBar-${mac.replaceAll(':', '').substring(8)}';
-    debugPrint('connectScanResult: alias calculado="$alias" advName="$advName" platName="$platName"');
+            : 'PixBar-${macClean.substring(macClean.length - 4)}';
     dev = PixBarDevice(btDevice: result.device, alias: alias);
+    dev.isManagerConnecting = () => _isConnecting;
     dev.addListener(notifyListeners);
     devices.add(dev);
     await _saveDevicesToPrefs();
   }
+  try{
   await dev.connect();
+  for (int i = 0; i < 30; i++) {
+    if (dev.connected) break;
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
   if (_activeTarget == null) setActiveDevice(dev);
   notifyListeners();
+  }  finally {
+  _isConnecting = false;  // ← liberar al final
+  }
   return dev;
 }
+
+
   // ── Desconectar un device ──
   Future<void> disconnectDevice(PixBarDevice device) async {
     await device.disconnect();

@@ -89,18 +89,28 @@ class DevicesScreen extends StatelessWidget {
 }
 
 // ── Tile de dispositivo ──
-class _DeviceTile extends StatelessWidget {
+class _DeviceTile extends StatefulWidget {
   final PixBarDevice device;
   final BleManager mgr;
   const _DeviceTile({required this.device, required this.mgr});
 
   @override
+  State<_DeviceTile> createState() => _DeviceTileState();
+}
+
+class _DeviceTileState extends State<_DeviceTile> {
+  bool _connecting = false;
+
+  @override
   Widget build(BuildContext context) {
+    final device = widget.device;
+    final mgr = widget.mgr;
     final isActive = mgr.activeTarget is DeviceTarget &&
         (mgr.activeTarget as DeviceTarget).device.id == device.id;
 
     return ListenableBuilder(
-      listenable: device,
+      //listenable: device,
+        listenable: Listenable.merge([device, mgr]),
       builder: (_, __) => Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
@@ -117,17 +127,21 @@ class _DeviceTile extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
               child: Row(children: [
-                // Indicador de conexión
-                Container(
-                  width: 8, height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: device.connected ? PixBarColors.green : const Color(0xFF444444),
-                    boxShadow: device.connected ? [
-                      BoxShadow(color: PixBarColors.green.withAlpha(150), blurRadius: 6)
-                    ] : null,
-                  ),
-                ),
+                // Indicador de conexión o spinner
+                _connecting
+                  ? const SizedBox(width: 8, height: 8,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5, color: PixBarColors.cyan))
+                  : Container(
+                      width: 8, height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: device.connected ? PixBarColors.green : const Color(0xFF444444),
+                        boxShadow: device.connected ? [
+                          BoxShadow(color: PixBarColors.green.withAlpha(150), blurRadius: 6)
+                        ] : null,
+                      ),
+                    ),
                 const SizedBox(width: 10),
                 // Nombre
                 Expanded(
@@ -138,8 +152,11 @@ class _DeviceTile extends StatelessWidget {
                         style: PixBarText.display.copyWith(
                           fontSize: 13,
                           color: device.connected ? PixBarColors.white : PixBarColors.grey)),
-                       Text(device.id,  // ← MAC address
-        style: PixBarText.mono.copyWith(fontSize: 9, color: PixBarColors.grey)),
+                      Text(device.id,
+                        style: PixBarText.mono.copyWith(fontSize: 9, color: PixBarColors.grey)),
+                      if (_connecting)
+                        Text('Conectando...',
+                          style: PixBarText.mono.copyWith(fontSize: 9, color: PixBarColors.cyan)),
                       if (device.alias != device.btName)
                         Text(device.btName,
                           style: PixBarText.mono.copyWith(fontSize: 9, color: PixBarColors.grey)),
@@ -174,13 +191,18 @@ class _DeviceTile extends StatelessWidget {
                 // CONECTAR / DESCONECTAR
                 Expanded(
                   child: _ActionBtn(
-                    label: device.connected ? 'DESCONECTAR' : 'CONECTAR',
+                    label: _connecting
+                      ? 'CONECTANDO...'
+                      : device.connected ? 'DESCONECTAR' : 'CONECTAR',
                     color: device.connected ? PixBarColors.magenta : PixBarColors.grey2,
+                    enabled: !_connecting,
                     onTap: () async {
                       if (device.connected) {
                         await mgr.disconnectDevice(device);
                       } else {
+                        setState(() => _connecting = true);
                         await device.connect();
+                        if (mounted) setState(() => _connecting = false);
                       }
                     },
                   ),
@@ -201,7 +223,7 @@ class _DeviceTile extends StatelessWidget {
   }
 
   void _showRenameDialog(BuildContext context) {
-    final ctrl = TextEditingController(text: device.alias);
+    final ctrl = TextEditingController(text: widget.device.alias);
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -212,7 +234,7 @@ class _DeviceTile extends StatelessWidget {
           autofocus: true,
           style: PixBarText.mono.copyWith(color: PixBarColors.white, fontSize: 13),
           decoration: InputDecoration(
-            hintText: device.btName,
+            hintText: widget.device.btName,
             hintStyle: PixBarText.mono.copyWith(color: PixBarColors.grey),
             enabledBorder: const UnderlineInputBorder(
               borderSide: BorderSide(color: PixBarColors.border)),
@@ -226,7 +248,7 @@ class _DeviceTile extends StatelessWidget {
             child: Text('CANCELAR', style: PixBarText.mono.copyWith(color: PixBarColors.grey))),
           TextButton(
             onPressed: () {
-              mgr.renameDevice(device, ctrl.text);
+              widget.mgr.renameDevice(widget.device, ctrl.text);
               Navigator.pop(context);
             },
             child: Text('GUARDAR', style: PixBarText.mono.copyWith(color: PixBarColors.cyan))),
@@ -241,7 +263,7 @@ class _DeviceTile extends StatelessWidget {
       builder: (_) => AlertDialog(
         backgroundColor: PixBarColors.panel,
         title: Text('Olvidar dispositivo', style: PixBarText.display.copyWith(fontSize: 14)),
-        content: Text('Se eliminará ${device.displayName} de la lista.\n¿Continuás?',
+        content: Text('Se eliminará ${widget.device.displayName} de la lista.\n¿Continuás?',
           style: PixBarText.mono.copyWith(fontSize: 12)),
         actions: [
           TextButton(
@@ -249,7 +271,7 @@ class _DeviceTile extends StatelessWidget {
             child: Text('CANCELAR', style: PixBarText.mono.copyWith(color: PixBarColors.grey))),
           TextButton(
             onPressed: () {
-              mgr.forgetDevice(device);
+              widget.mgr.forgetDevice(widget.device);
               Navigator.pop(context);
             },
             child: Text('OLVIDAR', style: PixBarText.mono.copyWith(color: PixBarColors.magenta))),
@@ -367,14 +389,21 @@ class _GroupTile extends StatelessWidget {
 }
 
 // ── Sheet de scan para agregar dispositivo ──
-class _ScanSheet extends StatelessWidget {
+class _ScanSheet extends StatefulWidget {
   final BleManager mgr;
   const _ScanSheet({required this.mgr});
 
   @override
+  State<_ScanSheet> createState() => _ScanSheetState();
+}
+
+class _ScanSheetState extends State<_ScanSheet> {
+  String? _connectingId; // MAC del device que está conectando
+
+  @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
-      value: mgr,
+      value: widget.mgr,
       child: Consumer<BleManager>(
         builder: (_, m, __) => Padding(
           padding: const EdgeInsets.all(20),
@@ -383,11 +412,13 @@ class _ScanSheet extends StatelessWidget {
             children: [
               Row(children: [
                 Text('AGREGAR DISPOSITIVO',
-                  style: PixBarText.mono.copyWith(fontSize: 11, letterSpacing: 2, color: PixBarColors.cyan)),
+                  style: PixBarText.mono.copyWith(
+                    fontSize: 11, letterSpacing: 2, color: PixBarColors.cyan)),
                 const Spacer(),
                 if (m.scanning)
                   const SizedBox(width: 18, height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: PixBarColors.cyan))
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2, color: PixBarColors.cyan))
                 else
                   TextButton(
                     onPressed: () => m.startScan(),
@@ -399,38 +430,51 @@ class _ScanSheet extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Text('No se encontraron nuevos dispositivos.',
-                    style: PixBarText.mono.copyWith(fontSize: 11, color: PixBarColors.grey),
+                    style: PixBarText.mono.copyWith(
+                      fontSize: 11, color: PixBarColors.grey),
                     textAlign: TextAlign.center),
                 )
-
-else
-  ...m.scanResults.map((r) {
-    final advName = r.advertisementData.advName;
-    final platName = r.device.platformName;
-    final mac = r.device.remoteId.str;
-    final macClean = mac.replaceAll(':', '');
-    final nombre = advName.isNotEmpty
-        ? advName
-        : platName.isNotEmpty
-            ? platName
-            : 'PixBar-${macClean.substring(macClean.length - 4)}';
-    return ListTile(
-      leading: const Icon(Icons.bluetooth, color: PixBarColors.cyan, size: 18),
-      title: Text(nombre,
-        style: PixBarText.mono.copyWith(fontSize: 12, color: PixBarColors.white)),
-      subtitle: Text(mac,
-        style: PixBarText.mono.copyWith(fontSize: 9, color: PixBarColors.grey)),
-      trailing: TextButton(
-        onPressed: () async {
-          Navigator.pop(context);
-          await m.connectScanResult(r);
-        },
-        child: Text('CONECTAR',
-          style: PixBarText.mono.copyWith(fontSize: 10, color: PixBarColors.cyan)),
-      ),
-    );
-  }),
-
+              else
+                ...m.scanResults.map((r) {
+                  final advName = r.advertisementData.advName;
+                  final platName = r.device.platformName;
+                  final mac = r.device.remoteId.str;
+                  final macClean = mac.replaceAll(':', '');
+                  final nombre = advName.isNotEmpty
+                      ? advName
+                      : platName.isNotEmpty
+                          ? platName
+                          : 'PixBar-${macClean.substring(macClean.length - 4)}';
+                  final isConnecting = _connectingId == mac;
+                  return ListTile(
+                    leading: isConnecting
+                      ? const SizedBox(width: 18, height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2, color: PixBarColors.cyan))
+                      : const Icon(Icons.bluetooth,
+                          color: PixBarColors.cyan, size: 18),
+                    title: Text(nombre,
+                      style: PixBarText.mono.copyWith(
+                        fontSize: 12, color: PixBarColors.white)),
+                    subtitle: Text(mac,
+                      style: PixBarText.mono.copyWith(
+                        fontSize: 9, color: PixBarColors.grey)),
+                    trailing: isConnecting
+                      ? Text('Conectando...',
+                          style: PixBarText.mono.copyWith(
+                            fontSize: 9, color: PixBarColors.cyan))
+                      : TextButton(
+                          onPressed: () async {
+                            setState(() => _connectingId = mac);
+                            await m.connectScanResult(r);
+                            if (context.mounted) Navigator.pop(context);
+                          },
+                          child: Text('CONECTAR',
+                            style: PixBarText.mono.copyWith(
+                              fontSize: 10, color: PixBarColors.cyan)),
+                        ),
+                  );
+                }),
               const SizedBox(height: 8),
             ],
           ),
@@ -439,7 +483,6 @@ else
     );
   }
 }
-
 // ── Sheet crear/editar grupo ──
 class _GroupEditSheet extends StatefulWidget {
   final BleManager mgr;
