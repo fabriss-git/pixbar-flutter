@@ -286,7 +286,7 @@ Future<PixBarDevice> connectScanResult(ScanResult result) async {
   }
   try{
   await dev.connect();
-  for (int i = 0; i < 30; i++) {
+  for (int i = 0; i < 60; i++) {
     if (dev.connected) break;
     await Future.delayed(const Duration(milliseconds: 500));
   }
