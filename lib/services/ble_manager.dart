@@ -1,20 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
+import 'package:uuid/uuid.dart' as uuid_pkg;
 import 'commands.dart';
 import 'pixbar_device.dart';
 import 'pixbar_group.dart';
 
 // ============================================================
-// BleManager — reemplaza BleService
-// Gestiona múltiples PixBarDevices, grupos, escaneo y persistencia.
+// BleManager — gestiona múltiples PixBarDevices, grupos,
+// escaneo y persistencia. Usa flutter_reactive_ble.
 // ============================================================
 
-/// Target activo: puede ser un PixBarDevice o un PixBarGroup.
-/// La UI usa esto para saber a quién mandar comandos.
 abstract class PixBarTarget {
   String get displayName;
   Future<void> cmd(int byte);
@@ -23,7 +21,6 @@ abstract class PixBarTarget {
   Future<void> setBrillo(double valor);
 }
 
-/// Adapter: PixBarDevice como target
 class DeviceTarget extends PixBarTarget {
   final PixBarDevice device;
   DeviceTarget(this.device);
@@ -34,12 +31,10 @@ class DeviceTarget extends PixBarTarget {
   @override Future<void> sendRGB(int r, int g, int b) => device.sendRGB(r, g, b);
   @override Future<void> setBrillo(double v) => device.setBrillo(v);
 
-  /// Estado del device activo (para mostrar en HomeScreen)
   PixBarState get state => device.state;
   bool get connected => device.connected;
 }
 
-/// Adapter: PixBarGroup como target
 class GroupTarget extends PixBarTarget {
   final PixBarGroup group;
   final List<PixBarDevice> allDevices;
@@ -51,7 +46,6 @@ class GroupTarget extends PixBarTarget {
   @override Future<void> sendRGB(int r, int g, int b) => group.sendRGB(r, g, b, allDevices);
   @override Future<void> setBrillo(double v) => group.setBrillo(v, allDevices);
 
-  /// Para grupos: estado del primer miembro conectado (o vacío)
   PixBarState get state {
     final first = allDevices
         .where((d) => group.memberIds.contains(d.id) && d.connected)
@@ -63,27 +57,23 @@ class GroupTarget extends PixBarTarget {
 // ============================================================
 
 class BleManager extends ChangeNotifier {
-  // ── Dispositivos conocidos y conectados ──
-  final List<PixBarDevice> devices = [];
+  // Una sola instancia de FlutterReactiveBle para toda la app
+  final FlutterReactiveBle _ble = FlutterReactiveBle();
 
-  // ── Grupos ──
+  final List<PixBarDevice> devices = [];
   final List<PixBarGroup> groups = [];
 
-  // ── Escaneo ──
+  // Escaneo
   bool _scanning = false;
-  final List<ScanResult> _scanResults = [];
+  final List<DiscoveredDevice> _scanResults = [];
   StreamSubscription? _scanSub;
 
-  bool _isConnecting = false; 
-
-  // ── Target activo (device o grupo que se está controlando) ──
   PixBarTarget? _activeTarget;
 
   bool get scanning => _scanning;
-  List<ScanResult> get scanResults => List.unmodifiable(_scanResults);
+  List<DiscoveredDevice> get scanResults => List.unmodifiable(_scanResults);
   PixBarTarget? get activeTarget => _activeTarget;
 
-  /// Shortcut: si el target activo es un DeviceTarget, su estado
   PixBarState get activeState {
     final t = _activeTarget;
     if (t is DeviceTarget) return t.state;
@@ -91,14 +81,12 @@ class BleManager extends ChangeNotifier {
     return const PixBarState();
   }
 
-  /// True si hay al menos un device conectado
   bool get anyConnected => devices.any((d) => d.connected);
 
-  // ── Init: cargar persistencia y reconectar ──
+  // ── Init ──
   Future<void> init() async {
     await _loadFromPrefs();
-    await _reconnectAll();
-    // Si ninguno conectó, el caller puede lanzar escaneo
+    _reconnectAll();
   }
 
   // ── Persistencia ──
@@ -109,7 +97,6 @@ class BleManager extends ChangeNotifier {
   Future<void> _loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Cargar devices conocidos
     final devJson = prefs.getString(_keyDevices);
     if (devJson != null) {
       final list = jsonDecode(devJson) as List;
@@ -117,15 +104,12 @@ class BleManager extends ChangeNotifier {
         final map = item as Map<String, dynamic>;
         final id    = map['id'] as String;
         final alias = map['alias'] as String? ?? '';
-        final btDev = BluetoothDevice.fromId(id);
-        final dev = PixBarDevice(btDevice: btDev, alias: alias);
-        dev.isManagerConnecting = () => _isConnecting; 
-        dev.addListener(notifyListeners); // propagar cambios al árbol
+        final dev = PixBarDevice(id: id, ble: _ble, alias: alias);
+        dev.addListener(notifyListeners);
         devices.add(dev);
       }
     }
 
-    // Cargar grupos
     final grpJson = prefs.getString(_keyGroups);
     if (grpJson != null) {
       final list = jsonDecode(grpJson) as List;
@@ -134,12 +118,8 @@ class BleManager extends ChangeNotifier {
       }
     }
 
-    // Restaurar target activo
     final activeId = prefs.getString(_keyActive);
-    if (activeId != null) {
-      // Se intentará setear después de reconectar
-      _pendingActiveId = activeId;
-    }
+    if (activeId != null) _pendingActiveId = activeId;
 
     notifyListeners();
   }
@@ -163,41 +143,36 @@ class BleManager extends ChangeNotifier {
     await prefs.setString(_keyActive, id);
   }
 
-  // ── Reconectar todos los devices conocidos en paralelo ──
-  Future<void> _reconnectAll() async {
-    //await Future.wait(devices.map((d) => d.connect()));
-      for (final d in devices) {
-    await d.connect();
-    if (d.connected) await Future.delayed(const Duration(milliseconds: 500));
-  }
-    // Restaurar target activo
-    if (_pendingActiveId != null) {
-      _restoreActiveTarget(_pendingActiveId!);
-      _pendingActiveId = null;
+  // ── Reconectar todos — flutter_reactive_ble reconecta solo ──
+  void _reconnectAll() {
+    for (final d in devices) {
+      d.connect(); // no await — el stream maneja reconexión automática
     }
-    // Si no hay target y hay al menos uno conectado, activar el primero
-    if (_activeTarget == null) {
-      final first = devices.where((d) => d.connected).firstOrNull;
-      if (first != null) setActiveDevice(first);
-    }
-    notifyListeners();
+    // Restaurar target activo después de un momento
+    Future.delayed(const Duration(seconds: 3), () {
+      if (_pendingActiveId != null) {
+        _restoreActiveTarget(_pendingActiveId!);
+        _pendingActiveId = null;
+      }
+      if (_activeTarget == null) {
+        final first = devices.where((d) => d.connected).firstOrNull;
+        if (first != null) setActiveDevice(first);
+      }
+      notifyListeners();
+    });
   }
 
   void _restoreActiveTarget(String id) {
-    // Intentar como device
     final dev = devices.where((d) => d.id == id).firstOrNull;
     if (dev != null && dev.connected) {
       _activeTarget = DeviceTarget(dev);
       return;
     }
-    // Intentar como grupo
     final grp = groups.where((g) => g.id == id).firstOrNull;
-    if (grp != null) {
-      _activeTarget = GroupTarget(grp, devices);
-    }
+    if (grp != null) _activeTarget = GroupTarget(grp, devices);
   }
 
-  // ── Setear target activo ──
+  // ── Target activo ──
   void setActiveDevice(PixBarDevice device) {
     _activeTarget = DeviceTarget(device);
     _saveActiveToPrefs(device.id);
@@ -210,99 +185,88 @@ class BleManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Escanear — busca nuevos PixBar no conocidos ──
-Future<void> startScan() async {
-  if (_scanning) return;
-  _scanning = true;
-  _scanResults.clear();
-  notifyListeners();
+  // ── Escanear ──
+  Future<void> startScan() async {
+    if (_scanning) return;
+    _scanning = true;
+    _scanResults.clear();
+    notifyListeners();
 
-  try {
-    _scanSub?.cancel();
+    try {
+      _scanSub?.cancel();
+      _scanSub = _ble.scanForDevices(
+        withServices: [Uuid.parse('12345678-1234-1234-1234-123456789abc')],
+        scanMode: ScanMode.lowLatency,
+      ).listen(
+        (device) {
+          debugPrint('SCAN: id=${device.id} name=${device.name}');
+          final alreadyKnown = devices.any((d) => d.id == device.id);
+          final alreadyInResults = _scanResults.any((r) => r.id == device.id);
+          if (!alreadyKnown && !alreadyInResults) {
+            _scanResults.add(device);
+            notifyListeners();
+          }
+        },
+        onError: (e) => debugPrint('Scan error: $e'),
+      );
 
-_scanSub = FlutterBluePlus.scanResults.listen((results) {
-  bool changed = false;
-  for (final r in results) {
-    final advName = r.advertisementData.advName;
-    final platName = r.device.platformName;
-    final name = advName.isNotEmpty ? advName : platName;
-    debugPrint('SCAN: advName="$advName" platName="$platName" mac=${r.device.remoteId.str}');
-    final alreadyKnown = devices.any((d) => d.id == r.device.remoteId.str);
-    final alreadyInResults = _scanResults.any((s) => s.device.remoteId == r.device.remoteId);
-    if (!alreadyKnown && !alreadyInResults) {
-      _scanResults.add(r);
-      changed = true;
+      // Detener después de 10 segundos
+      await Future.delayed(const Duration(seconds: 10));
+      stopScan();
+
+    } catch (e) {
+      debugPrint('Scan error: $e');
+      _scanning = false;
+      notifyListeners();
     }
   }
-  if (changed) notifyListeners();
-});
-
-    // Sin filtro de nombre — filtramos nosotros por advName
-    await FlutterBluePlus.startScan(
-      withServices: [Guid('12345678-1234-1234-1234-123456789abc')],
-      timeout: const Duration(seconds: 10),
-    );
-
-  } catch (e) {
-    debugPrint('Scan error: $e');
-  } finally {
-    _scanning = false;
-    notifyListeners();
-  }
-}
 
   void stopScan() {
-    FlutterBluePlus.stopScan();
     _scanSub?.cancel();
     _scanning = false;
     notifyListeners();
   }
 
-  // ── Conectar un device encontrado en el scan ──
-Future<PixBarDevice> connectScanResult(ScanResult result) async {
-  _isConnecting = true; 
-  // Detener scan antes de conectar
+  // ── Conectar device encontrado en scan ──
+ Future<PixBarDevice> connectScanResult(DiscoveredDevice result) async {
   stopScan();
 
-
-  await Future.delayed(const Duration(seconds: 2)); //antes milliseconds: 300
-
-  var dev = devices.where((d) => d.id == result.device.remoteId.str).firstOrNull;
+  var dev = devices.where((d) => d.id == result.id).firstOrNull;
   if (dev == null) {
-    final advName = result.advertisementData.advName;
-    final platName = result.device.platformName;
-    final mac = result.device.remoteId.str;
-    final macClean = mac.replaceAll(':', '');
-    final alias = advName.isNotEmpty
-        ? advName
-        : platName.isNotEmpty
-            ? platName
-            : 'PixBar-${macClean.substring(macClean.length - 4)}';
-    dev = PixBarDevice(btDevice: result.device, alias: alias);
-    dev.isManagerConnecting = () => _isConnecting;
+    final name = result.name.isNotEmpty
+        ? result.name
+        : 'PixBar-${result.id.replaceAll(':', '').substring(result.id.replaceAll(':', '').length - 4)}';
+    dev = PixBarDevice(id: result.id, ble: _ble, alias: name);
     dev.addListener(notifyListeners);
     devices.add(dev);
     await _saveDevicesToPrefs();
   }
-  try{
-  await dev.connect();
-  for (int i = 0; i < 60; i++) {
-    if (dev.connected) break;
-    await Future.delayed(const Duration(milliseconds: 500));
+debugPrint('connectScanResult: llamando connect() para ${dev.id}');
+ //await dev.connect(); // sin await — el stream notifica cuando conecta
+ dev.connect();
+//debugPrint('connectScanResult: connect() retornó, connected=${dev.connected}');
+debugPrint('connectScanResult: device agregado, esperando conexión...');
+  // Esperar conexión real
+  //for (int i = 0; i < 30; i++) {
+  //  if (dev.connected) break;
+  //  await Future.delayed(const Duration(milliseconds: 500));
+ // }
+  void dbgListener() {
+    debugPrint('connectScanResult listener: connected=${dev!.connected}');
   }
+  dev.addListener(dbgListener);
+  Future.delayed(const Duration(seconds: 10), () {
+    dev!.removeListener(dbgListener);
+  });
+
   if (_activeTarget == null) setActiveDevice(dev);
   notifyListeners();
-  }  finally {
-  _isConnecting = false;  // ← liberar al final
-  }
   return dev;
 }
 
-
-  // ── Desconectar un device ──
+  // ── Desconectar device ──
   Future<void> disconnectDevice(PixBarDevice device) async {
     await device.disconnect();
-    // Si era el target activo, cambiar al primer conectado disponible
     if (_activeTarget is DeviceTarget &&
         (_activeTarget as DeviceTarget).device.id == device.id) {
       final next = devices.where((d) => d.connected && d.id != device.id).firstOrNull;
@@ -315,12 +279,11 @@ Future<PixBarDevice> connectScanResult(ScanResult result) async {
     }
   }
 
-  // ── Olvidar un device (eliminar de la lista permanente) ──
+  // ── Olvidar device ──
   Future<void> forgetDevice(PixBarDevice device) async {
     await device.disconnect();
     device.removeListener(notifyListeners);
     devices.remove(device);
-    // Eliminar de grupos
     for (final g in groups) {
       g.memberIds.remove(device.id);
     }
@@ -331,15 +294,15 @@ Future<PixBarDevice> connectScanResult(ScanResult result) async {
 
   // ── Renombrar device ──
   Future<void> renameDevice(PixBarDevice device, String newAlias) async {
-    device.alias = newAlias.trim().isEmpty ? device.btName : newAlias.trim();
+    device.alias = newAlias.trim().isEmpty ? device.id : newAlias.trim();
     await _saveDevicesToPrefs();
     notifyListeners();
   }
 
-  // ── Grupos: crear ──
+  // ── Grupos ──
   Future<PixBarGroup> createGroup(String name, List<String> memberIds) async {
     final group = PixBarGroup(
-      id: const Uuid().v4(),
+      id: const uuid_pkg.Uuid().v4(),
       name: name,
       memberIds: memberIds,
     );
@@ -349,7 +312,6 @@ Future<PixBarDevice> connectScanResult(ScanResult result) async {
     return group;
   }
 
-  // ── Grupos: editar ──
   Future<void> updateGroup(PixBarGroup group, {String? name, List<String>? memberIds}) async {
     if (name != null) group.name = name;
     if (memberIds != null) group.memberIds = memberIds;
@@ -357,9 +319,7 @@ Future<PixBarDevice> connectScanResult(ScanResult result) async {
     notifyListeners();
   }
 
-  // ── Grupos: eliminar ──
   Future<void> deleteGroup(PixBarGroup group) async {
-    // Si era el target activo, limpiar
     if (_activeTarget is GroupTarget &&
         (_activeTarget as GroupTarget).group.id == group.id) {
       final first = devices.where((d) => d.connected).firstOrNull;

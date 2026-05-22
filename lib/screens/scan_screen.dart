@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import '../services/ble_manager.dart';
 import '../theme/app_theme.dart';
 import '../widgets/logo_widget.dart';
 import 'home_screen.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -14,7 +14,6 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  bool _connecting = false;
   @override
   void initState() {
     super.initState();
@@ -27,129 +26,135 @@ class _ScanScreenState extends State<ScanScreen> {
   Widget build(BuildContext context) {
     final mgr = context.watch<BleManager>();
 
-    // Si ya conectó alguno, ir a Home
-//if (mgr.anyConnected || mgr.devices.isNotEmpty) {
-  if (mgr.anyConnected || mgr.devices.isNotEmpty) {
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+    //if (mgr.anyConnected || mgr.devices.isNotEmpty) {
+    if (mgr.anyConnected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        }
+      });
     }
-  });
-}
 
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: PixBarColors.background,
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Spacer(flex: 2),
+                  const PixBarLogo(size: 'large'),
+                  const SizedBox(height: 8),
+                  Text(
+                    'ARCADE · AMBIENT · MUSIC',
+                    style: PixBarText.mono.copyWith(
+                      fontSize: 11, color: PixBarColors.grey, letterSpacing: 3),
+                  ),
+                  const Spacer(flex: 2),
 
-return Stack(
-  children: [
-    Scaffold(
-      backgroundColor: PixBarColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(flex: 2),
-              const PixBarLogo(size: 'large'),
-              const SizedBox(height: 8),
-              Text(
-                'ARCADE · AMBIENT · MUSIC',
-                style: PixBarText.mono.copyWith(
-                  fontSize: 11, color: PixBarColors.grey, letterSpacing: 3),
-              ),
-              const Spacer(flex: 2),
-
-              // Estado / resultados
-              if (mgr.scanning)
-                Column(children: [
-                  const SizedBox(
-                    width: 24, height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2, color: PixBarColors.cyan),
-                  ),
-                  const SizedBox(height: 12),
-                  Text('Buscando PixBar...',
-                    style: PixBarText.mono.copyWith(fontSize: 11, color: PixBarColors.grey2)),
-                ])
-              else if (mgr.scanResults.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: PixBarColors.panel,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: PixBarColors.border),
-                  ),
-                  child: Text(
-                    'No se encontraron dispositivos.\nAsegurate de que el PixBar esté encendido.',
-                    style: PixBarText.mono.copyWith(fontSize: 11, color: PixBarColors.grey2),
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              else
-                Container(
-                  decoration: BoxDecoration(
-                    color: PixBarColors.panel,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: PixBarColors.border),
-                  ),
-                  child: Column(
-                    children: mgr.scanResults.map((result) {
-                      return _ScanResultTile(
-                        result: result,
+                  if (mgr.scanning)
+                    Column(children: [
+                      const SizedBox(
+                        width: 24, height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2, color: PixBarColors.cyan),
+                      ),
+                      const SizedBox(height: 12),
+                      Text('Buscando PixBar...',
+                        style: PixBarText.mono.copyWith(
+                          fontSize: 11, color: PixBarColors.grey2)),
+                    ])
+                  else if (mgr.scanResults.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: PixBarColors.panel,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: PixBarColors.border),
+                      ),
+                      child: Text(
+                        'No se encontraron dispositivos.\nAsegurate de que el PixBar esté encendido.',
+                        style: PixBarText.mono.copyWith(
+                          fontSize: 11, color: PixBarColors.grey2),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  else
+                    Container(
+                      decoration: BoxDecoration(
+                        color: PixBarColors.panel,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: PixBarColors.border),
+                      ),
+                      child: Column(
+                        children: mgr.scanResults.map((result) {
+                          return _ScanResultTile(
+                            result: result,
+                          
 onConnect: () async {
+  //final dev = await mgr.connectScanResult(result);
   await mgr.connectScanResult(result);
+  // Navegar solo si conectó
+  //if (dev.connected && mounted) {
+  //  Navigator.of(context).pushReplacement(
+  //    MaterialPageRoute(builder: (_) => const HomeScreen()),
+  //  );
+ // }
 },
-                      );
-                    }).toList(),
-                  ),
-                ),
 
-              const SizedBox(height: 16),
+                          );
+                        }).toList(),
+                      ),
+                    ),
 
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: mgr.scanning ? null : () => mgr.startScan(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: mgr.scanResults.isNotEmpty
-                      ? const Color(0xFF880055)
-                      : const Color(0xFFFF0090),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: PixBarColors.panel2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                  const SizedBox(height: 16),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: mgr.scanning ? null : () => mgr.startScan(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: mgr.scanResults.isNotEmpty
+                          ? const Color(0xFF880055)
+                          : const Color(0xFFFF0090),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: PixBarColors.panel2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: mgr.scanning
+                        ? const SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2, color: PixBarColors.grey),
+                          )
+                        : Text('BUSCAR',
+                            style: PixBarText.display.copyWith(fontSize: 16)),
                     ),
                   ),
-                  child: mgr.scanning
-                    ? const SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2, color: PixBarColors.grey),
-                      )
-                    : Text('BUSCAR',
-                        style: PixBarText.display.copyWith(fontSize: 16)),
-                ),
-              ),
 
-              const Spacer(),
-            ],
+                  const Spacer(),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
-    ),  // ← cierra Scaffold
-
-  ],  // ← cierra children del Stack
-);   // ← cierra Stack
-
-
+      ],
+    );
   }
 }
 
 class _ScanResultTile extends StatefulWidget {
-  final ScanResult result;                          // ← era String name
+  final DiscoveredDevice result;
   final Future<void> Function() onConnect;
   const _ScanResultTile({required this.result, required this.onConnect});
 
@@ -160,18 +165,15 @@ class _ScanResultTile extends StatefulWidget {
 class _ScanResultTileState extends State<_ScanResultTile> {
   bool _connecting = false;
 
-@override
+  @override
   Widget build(BuildContext context) {
-final advName = widget.result.advertisementData.advName;
-final platName = widget.result.device.platformName;
-final mac = widget.result.device.remoteId.str;
-final macClean = mac.replaceAll(':', '');
-final displayName = advName.isNotEmpty
-    ? advName
-    : platName.isNotEmpty
-        ? platName
+    final name = widget.result.name;
+    final mac = widget.result.id;
+    final macClean = mac.replaceAll(':', '');
+    final displayName = name.isNotEmpty
+        ? name
         : 'PixBar-${macClean.substring(macClean.length - 4)}';
-//debugPrint('TILE: mac=$mac macClean=$macClean displayName=$displayName');
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
@@ -189,12 +191,16 @@ final displayName = advName.isNotEmpty
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(displayName,
-                style: PixBarText.mono.copyWith(fontSize: 12, color: PixBarColors.white)),
-              Text(mac,
-                style: PixBarText.mono.copyWith(fontSize: 9, color: PixBarColors.grey)),
+                style: PixBarText.mono.copyWith(
+                  fontSize: 12, color: PixBarColors.white)),
+                  //Muestra MAC en scan:
+              //Text(mac,
+               // style: PixBarText.mono.copyWith(
+                //  fontSize: 9, color: PixBarColors.grey)),
               if (_connecting)
                 Text('Conectando...',
-                  style: PixBarText.mono.copyWith(fontSize: 9, color: PixBarColors.cyan)),
+                  style: PixBarText.mono.copyWith(
+                    fontSize: 9, color: PixBarColors.cyan)),
             ],
           ),
         ),
@@ -202,12 +208,12 @@ final displayName = advName.isNotEmpty
           TextButton(
             onPressed: () async {
               setState(() => _connecting = true);
-              await Future.delayed(const Duration(milliseconds: 100)); 
               await widget.onConnect();
               if (mounted) setState(() => _connecting = false);
             },
             child: Text('CONECTAR',
-              style: PixBarText.mono.copyWith(fontSize: 10, color: PixBarColors.cyan)),
+              style: PixBarText.mono.copyWith(
+                fontSize: 10, color: PixBarColors.cyan)),
           ),
       ]),
     );

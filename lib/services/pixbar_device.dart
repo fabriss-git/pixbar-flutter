@@ -1,183 +1,190 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'commands.dart';
 
 // ============================================================
 // PixBarDevice — un dispositivo BLE individual
+// Usa flutter_reactive_ble para conexión confiable múltiple
 // ============================================================
 class PixBarDevice extends ChangeNotifier {
-  final BluetoothDevice btDevice;
+  final String id; // MAC address
+  final FlutterReactiveBle _ble;
 
-  BluetoothCharacteristic? _cmdChar;
-  BluetoothCharacteristic? _stateChar;
-  StreamSubscription? _stateSub;
   StreamSubscription? _connSub;
+  StreamSubscription? _stateSub;
 
   bool _connected = false;
   bool _intentionalDisconnect = false;
   PixBarState _state = const PixBarState();
-  bool Function()? isManagerConnecting;  // agregado 16052026
-
-  // Alias editable por el usuario. Por defecto usa el nombre BT (ej: "PixBar-A3F2")
   String alias;
 
+  // Características BLE
+  late QualifiedCharacteristic _cmdChar;
+  late QualifiedCharacteristic _stateChar;
+
+  static const _serviceUuid = '12345678-1234-1234-1234-123456789abc';
+  static const _stateUuid   = '12345678-1234-1234-1234-123456789ab1';
+  static const _cmdUuid     = '12345678-1234-1234-1234-123456789ab2';
+
   PixBarDevice({
-    required this.btDevice,
+    required this.id,
+    required FlutterReactiveBle ble,
     String? alias,
-  }) : alias = alias ?? btDevice.platformName;
+  })  : _ble = ble,
+        alias = alias ?? id {
+    _cmdChar = QualifiedCharacteristic(
+      serviceId: Uuid.parse(_serviceUuid),
+      characteristicId: Uuid.parse(_cmdUuid),
+      deviceId: id,
+    );
+    _stateChar = QualifiedCharacteristic(
+      serviceId: Uuid.parse(_serviceUuid),
+      characteristicId: Uuid.parse(_stateUuid),
+      deviceId: id,
+    );
+  }
 
   // ── Getters ──
-  String get id => btDevice.remoteId.str;
-  String get btName => btDevice.platformName;
+  String get btName => alias;
   bool get connected => _connected;
   PixBarState get state => _state;
-
-  /// Nombre que se muestra: alias si fue renombrado, si no el nombre BT
-  String get displayName => alias.isNotEmpty ? alias : btName;
+  String get displayName => alias.isNotEmpty ? alias : id;
 
   // ── Conectar ──
-  Future<void> connect({int retry = 0}) async {
-    try {
-      //await btDevice.connect(); borrado 13052026
-      await btDevice.connect(timeout: const Duration(seconds: 15));
+  Future<void> connect() async {
+  _intentionalDisconnect = false;
+  _connSub?.cancel();
 
-      _connSub?.cancel();
-      _connSub = btDevice.connectionState.listen((s) {
-        if (s == BluetoothConnectionState.disconnected) _onDisconnect();
-      });
-
-      await _discoverServices();
-      _connected = true;
-      notifyListeners();
-    } catch (e) {
-      final msg = e.toString();
-      if (msg.contains('147') && retry < 2) {
-        await Future.delayed(const Duration(milliseconds: 1500));
-        await connect(retry: retry + 1);
-      } else if (msg.contains('already connected')) {
-        // GATT sigue abierto — solo redescubrir
-        try {
-          await _discoverServices();
-          _connected = true;
-          notifyListeners();
-        } catch (_) {}
+  _connSub = _ble.connectToDevice(
+    id: id,
+    servicesWithCharacteristicsToDiscover: {
+      Uuid.parse(_serviceUuid): [
+        Uuid.parse(_stateUuid),
+        Uuid.parse(_cmdUuid),
+      ],
+    },
+    connectionTimeout: const Duration(seconds: 8), //antes 30
+  ).listen(
+    (update) {
+      debugPrint('[$displayName] connectionState: ${update.connectionState}');
+      switch (update.connectionState) {
+        case DeviceConnectionState.connected:
+          _onConnected();
+          break;
+        case DeviceConnectionState.disconnected:
+          if (!_intentionalDisconnect) {
+            _onUnexpectedDisconnect();
+          } else {
+            _onIntentionalDisconnect();
+          }
+          break;
+        default:
+          break;
       }
-    }
+    },
+    onError: (e) {
+      debugPrint('[$displayName] connection error: $e — reintentando en 3');
+      _connected = false;
+      notifyListeners();
+      if (!_intentionalDisconnect) {
+        Future.delayed(const Duration(seconds: 3), () {
+          if (!_connected && !_intentionalDisconnect) connect();
+        });
+      }
+    },
+  );
+}
+
+  void _onConnected() async {
+    debugPrint('[$displayName] _onConnected llamado — connected=$_connected');
+  
+      try {
+    await _ble.requestMtu(deviceId: id, mtu: 185);
+    debugPrint('[$displayName] MTU negociado');
+  } catch (e) {
+    debugPrint('[$displayName] MTU error: $e');
+  }
+
+    _connected = true;
+    notifyListeners();
+    debugPrint('[$displayName] notifyListeners llamado');
+    _subscribeToState();
+  }
+
+void _onUnexpectedDisconnect() {
+  _connected = false;
+  _stateSub?.cancel();
+  notifyListeners();
+  // Delay escalonado basado en el último byte del MAC
+  final lastByte = int.tryParse(id.split(':').last, radix: 16) ?? 0;
+  final delay = 2 + (lastByte % 4); // entre 2 y 5 segundos
+  debugPrint('[$displayName] desconexión inesperada — reintentando en ${delay}s');
+  Future.delayed(Duration(seconds: delay), () {
+    if (!_connected && !_intentionalDisconnect) connect();
+  });
+}
+
+  void _onIntentionalDisconnect() {
+    _connected = false;
+    _stateSub?.cancel();
+    notifyListeners();
+  }
+
+  void _subscribeToState() {
+    _stateSub?.cancel();
+    _stateSub = _ble.subscribeToCharacteristic(_stateChar).listen(
+      _onStateReceived,
+      onError: (e) => debugPrint('[$displayName] state sub error: $e'),
+    );
   }
 
   // ── Desconectar (intencional) ──
   Future<void> disconnect() async {
-      debugPrint('[$displayName] disconnect() llamado');
-  debugPrint(StackTrace.current.toString()); // ← ver quién lo llama
     _intentionalDisconnect = true;
-    _connected = false;
-    _cmdChar = null;
-    _stateChar = null;
     _stateSub?.cancel();
     _connSub?.cancel();
-    try { await btDevice.disconnect(); } catch (_) {}
-    notifyListeners();
-  }
-// ── Cancelar autoreconexión temporalmente ──
-void cancelAutoReconnect() {
-  _intentionalDisconnect = true;
-  Future.delayed(const Duration(milliseconds: 100), () {
-    _intentionalDisconnect = false;
-  });
-}
-  // ── Desconexión inesperada → autoreconectar ──
-  void _onDisconnect() {
     _connected = false;
-    _cmdChar = null;
-    _stateChar = null;
-    _stateSub?.cancel();
     notifyListeners();
-    if (!_intentionalDisconnect) _autoReconnect();
-    _intentionalDisconnect = false;
-  }
-
-Future<void> _autoReconnect() async {
-  // Esperar un poco antes de empezar a intentar
-  await Future.delayed(const Duration(seconds: 2));
-  
-  while (!_connected && !_intentionalDisconnect) {
-    await Future.delayed(const Duration(seconds: 4));
-    if (_intentionalDisconnect) break;
-    
-    // Si el manager está conectando otro device, esperar más
-    while (isManagerConnecting?.call() == true) {
-      await Future.delayed(const Duration(seconds: 2));
-    }
-    
-    try {
-      await btDevice.connect(timeout: const Duration(seconds: 8));
-      await _discoverServices();
-      _connected = true;
-      notifyListeners();
-      return;
-    } catch (e) {
-      if (e.toString().contains('already connected')) {
-        try {
-          await _discoverServices();
-          _connected = true;
-          notifyListeners();
-          return;
-        } catch (_) {}
-      }
-    }
-  }
-}
-
-  // ── Descubrir servicios y características ──
-  Future<void> _discoverServices() async {
-    final services = await btDevice.discoverServices();
-    for (final svc in services) {
-      if (svc.uuid.toString().toLowerCase().contains('9abc')) {
-        for (final char in svc.characteristics) {
-          final uuid = char.uuid.toString().toLowerCase();
-          if (uuid.contains('9ab1')) {
-            _stateChar = char;
-            await char.setNotifyValue(true);
-            _stateSub?.cancel();
-            _stateSub = char.onValueReceived.listen(_onStateReceived);
-          }
-          if (uuid.contains('9ab2')) _cmdChar = char;
-        }
-      }
-    }
   }
 
   // ── Recibir estado BLE ──
-  void _onStateReceived(List<int> value) {
-    try {
-      final raw = utf8.decode(value);
-      final newState = PixBarState.fromJson(raw);
-      // Notificar solo si cambió algo relevante
-      if (newState != _state) {
-        _state = newState;
-        notifyListeners();
-      } else {
-        _state = newState;
-      }
-    } catch (_) {}
-  }
+ final List<int> _buffer = [];
+
+void _onStateReceived(List<int> value) {
+  debugPrint('[$displayName] bytes recibidos: ${value.length} — ${String.fromCharCodes(value)}');
+  _buffer.addAll(value);
+  final raw = utf8.decode(_buffer, allowMalformed: true);
+  if (!raw.contains('{') || !raw.contains('}')) return; // esperar JSON completo
+  _buffer.clear();
+  try {
+    debugPrint('[$displayName] JSON completo: $raw');
+    final newState = PixBarState.fromJson(raw);
+    if (newState != _state) {
+      _state = newState;
+      notifyListeners();
+    } else {
+      _state = newState;
+    }
+  } catch (_) {}
+}
 
   // ── Enviar comandos ──
   Future<void> cmd(int byte) async {
-    if (!_connected || _cmdChar == null) return;
+    if (!_connected) return;
     try {
-      await _cmdChar!.write([byte], withoutResponse: true);
+      //await _ble.writeCharacteristicWithoutResponse(_cmdChar, value: [byte]);
+      await _ble.writeCharacteristicWithResponse(_cmdChar, value: [byte]);
     } catch (e) {
       debugPrint('[$displayName] cmd error: $e');
     }
   }
 
   Future<void> cmdBytes(List<int> bytes) async {
-    if (!_connected || _cmdChar == null) return;
+    if (!_connected) return;
     try {
-      await _cmdChar!.write(bytes, withoutResponse: false);
+      await _ble.writeCharacteristicWithResponse(_cmdChar, value: bytes);
     } catch (e) {
       debugPrint('[$displayName] cmdBytes error: $e');
     }

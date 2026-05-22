@@ -107,37 +107,8 @@ class HomeScreen extends StatelessWidget {
 
                     const SizedBox(height: 10),
 
-                    Center(
-                      child: GestureDetector(
-                        onTap: () => target?.cmd(
-                          apagado ? PixBarCmd.continuar : PixBarCmd.apagar),
-                        child: Container(
-                          width: 64, height: 64,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: apagado
-                              ? const Color(0xFF0A1A0A)
-                              : const Color(0xFF1A0A0A),
-                            border: Border.all(
-                              color: apagado
-                                ? PixBarColors.green.withAlpha(150)
-                                : PixBarColors.magenta.withAlpha(150),
-                              width: 2,
-                            ),
-                            boxShadow: [BoxShadow(
-                              color: apagado
-                                ? PixBarColors.green.withAlpha(60)
-                                : PixBarColors.magenta.withAlpha(60),
-                              blurRadius: 12,
-                            )],
-                          ),
-                          child: Icon(
-                            Icons.power_settings_new, size: 32,
-                            color: apagado ? PixBarColors.green : PixBarColors.magenta,
-                          ),
-                        ),
-                      ),
-                    ),
+
+              //aca estaba el boton power abajo de todo
 
                     const SizedBox(height: 16),
                   ],
@@ -163,52 +134,91 @@ class _Header extends StatelessWidget {
     final target = mgr.activeTarget;
     final state = mgr.activeState;
     final muted = state.mute;
+    final apagado = state.modo == 15;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: PixBarColors.border)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
         children: [
-          const PixBarLogo(size: 'small'),
+          // ── Fila 1: Logo, Mute, Power ──
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const PixBarLogo(size: 'small'),
 
-          // Mute
-          GestureDetector(
-            onTap: () => target?.cmd(PixBarCmd.mute),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: muted ? const Color(0xFF1A0A0A) : PixBarColors.panel2,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: muted ? PixBarColors.magenta : PixBarColors.border),
+              // Mute
+              SizedBox(
+              height: 30,
+              child: GestureDetector(
+                onTap: () => target?.cmd(PixBarCmd.mute),
+                child: Container(
+                  //padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  decoration: BoxDecoration(
+                    color: muted ? const Color(0xFF1A0A0A) : PixBarColors.panel2,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: muted ? PixBarColors.magenta : PixBarColors.border),
+                  ),
+                  child: Row(children: [
+                    Text(muted ? '🔇' : '🔊', style: const TextStyle(fontSize: 12)),
+                    const SizedBox(width: 4),
+                    Text(muted ? 'UNMUTE' : 'MUTE',
+                      style: PixBarText.mono.copyWith(
+                        fontSize: 9,
+                        color: muted ? PixBarColors.magenta : PixBarColors.grey2)),
+                  ]),
+                ),
               ),
-              child: Row(children: [
-                Text(muted ? '🔇' : '🔊', style: const TextStyle(fontSize: 12)),
-                const SizedBox(width: 4),
-                Text(muted ? 'UNMUTE' : 'MUTE',
-                  style: PixBarText.mono.copyWith(
-                    fontSize: 9,
-                    color: muted ? PixBarColors.magenta : PixBarColors.grey2)),
-              ]),
-            ),
+              ),
+
+
+              // Power
+              SizedBox(
+              height: 30,
+              child: GestureDetector(
+                onTap: () => target?.cmd(
+                  apagado ? PixBarCmd.continuar : PixBarCmd.apagar),
+                child: Container(
+                  //padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  decoration: BoxDecoration(
+                    color: apagado ? const Color(0xFF0A1A0A) : const Color(0xFF1A0A0A),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: apagado
+                        ? PixBarColors.green.withAlpha(150)
+                        : PixBarColors.magenta.withAlpha(150)),
+                  ),
+                  child: Icon(
+                    Icons.power_settings_new, size: 16,
+                    color: apagado ? PixBarColors.green : PixBarColors.magenta,
+                  ),
+                ),
+              ),
+              ),
+            ],
           ),
 
-          // Botón de dispositivos — muestra el nombre del target activo
+          const SizedBox(height: 8),
+
+          // ── Fila 2: Botón dispositivos ancho completo ──
           GestureDetector(
             onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const DevicesScreen())),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
+                color: PixBarColors.panel2,
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(
                   color: mgr.anyConnected
                     ? const Color(0x4400E5FF)
                     : PixBarColors.border),
-                borderRadius: BorderRadius.circular(6),
-                color: PixBarColors.panel2,
               ),
               child: Row(children: [
                 Container(
@@ -219,17 +229,22 @@ class _Header extends StatelessWidget {
                       ? PixBarColors.green
                       : const Color(0xFF333333),
                     boxShadow: mgr.anyConnected ? [
-                      BoxShadow(color: PixBarColors.green.withAlpha(150), blurRadius: 6)
+                      BoxShadow(
+                        color: PixBarColors.green.withAlpha(150),
+                        blurRadius: 6)
                     ] : null,
                   ),
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  target?.displayName ?? 'Sin conexión',
-                  style: PixBarText.mono.copyWith(fontSize: 10),
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    target?.displayName ?? 'Sin conexión',
+                    style: PixBarText.mono.copyWith(
+                      fontSize: 10, color: PixBarColors.white),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 ),
-                const SizedBox(width: 4),
                 const Icon(Icons.expand_more, size: 14, color: PixBarColors.grey),
               ]),
             ),
@@ -239,6 +254,7 @@ class _Header extends StatelessWidget {
     );
   }
 }
+
 
 // ── InfoStrip ──
 class _InfoStrip extends StatelessWidget {
