@@ -98,7 +98,7 @@ class PixBarDevice extends ChangeNotifier {
 }
 
   void _onConnected() async {
-    debugPrint('[$displayName] _onConnected llamado — connected=$_connected');
+    //debugPrint('[$displayName] _onConnected llamado — connected=$_connected'); //debug para nombre pixbar
   
       try {
     await _ble.requestMtu(deviceId: id, mtu: 185);
@@ -109,7 +109,7 @@ class PixBarDevice extends ChangeNotifier {
 
     _connected = true;
     notifyListeners();
-    debugPrint('[$displayName] notifyListeners llamado');
+    //debugPrint('[$displayName] notifyListeners llamado'); //debug par nombre pixbar
     _subscribeToState();
   }
 
@@ -153,13 +153,13 @@ void _onUnexpectedDisconnect() {
  final List<int> _buffer = [];
 
 void _onStateReceived(List<int> value) {
-  debugPrint('[$displayName] bytes recibidos: ${value.length} — ${String.fromCharCodes(value)}');
+  //debugPrint('[$displayName] bytes recibidos: ${value.length} — ${String.fromCharCodes(value)}'); //debur para medir MTU
   _buffer.addAll(value);
   final raw = utf8.decode(_buffer, allowMalformed: true);
   if (!raw.contains('{') || !raw.contains('}')) return; // esperar JSON completo
   _buffer.clear();
   try {
-    debugPrint('[$displayName] JSON completo: $raw');
+    //debugPrint('[$displayName] JSON completo: $raw');//debug para medir MTU
     final newState = PixBarState.fromJson(raw);
     if (newState != _state) {
       _state = newState;
@@ -175,7 +175,14 @@ void _onStateReceived(List<int> value) {
     if (!_connected) return;
     try {
       //await _ble.writeCharacteristicWithoutResponse(_cmdChar, value: [byte]);
-      await _ble.writeCharacteristicWithResponse(_cmdChar, value: [byte]);
+    final before = DateTime.now().millisecondsSinceEpoch; //agregado para el debug
+
+      //await _ble.writeCharacteristicWithResponse(_cmdChar, value: [byte]);
+      await _ble.writeCharacteristicWithoutResponse(_cmdChar, value: [byte]);
+
+    final after = DateTime.now().millisecondsSinceEpoch;//agregado para el debug
+    //debugPrint('[$displayName] cmd 0x${byte.toRadixString(16)} tardó ${after - before}ms');//agregado para el debug
+
     } catch (e) {
       debugPrint('[$displayName] cmd error: $e');
     }

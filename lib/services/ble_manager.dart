@@ -241,23 +241,27 @@ class BleManager extends ChangeNotifier {
     devices.add(dev);
     await _saveDevicesToPrefs();
   }
-debugPrint('connectScanResult: llamando connect() para ${dev.id}');
+//debugPrint('connectScanResult: llamando connect() para ${dev.id}'); //debug para nombre pixbar
  //await dev.connect(); // sin await — el stream notifica cuando conecta
  dev.connect();
 //debugPrint('connectScanResult: connect() retornó, connected=${dev.connected}');
-debugPrint('connectScanResult: device agregado, esperando conexión...');
+//debugPrint('connectScanResult: device agregado, esperando conexión...'); //debug para conexion bluetooth
   // Esperar conexión real
   //for (int i = 0; i < 30; i++) {
   //  if (dev.connected) break;
   //  await Future.delayed(const Duration(milliseconds: 500));
  // }
-  void dbgListener() {
-    debugPrint('connectScanResult listener: connected=${dev!.connected}');
-  }
-  dev.addListener(dbgListener);
-  Future.delayed(const Duration(seconds: 10), () {
-    dev!.removeListener(dbgListener);
-  });
+
+
+//Funcion para hacer debug de nombre y conexion bluetooth
+//  void dbgListener() {
+//    debugPrint('connectScanResult listener: connected=${dev!.connected}');
+//  }
+//  dev.addListener(dbgListener);
+//  Future.delayed(const Duration(seconds: 10), () {
+//    dev!.removeListener(dbgListener);
+//  });
+
 
   if (_activeTarget == null) setActiveDevice(dev);
   notifyListeners();
