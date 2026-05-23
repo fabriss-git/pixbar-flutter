@@ -233,6 +233,13 @@ class BleManager extends ChangeNotifier {
 
   var dev = devices.where((d) => d.id == result.id).firstOrNull;
   if (dev == null) {
+    
+    //limite de 10 pixbar asociados simultaneos
+    if (devices.length >= 10) {
+      // Límite alcanzado — no agregar
+      return devices.first;
+    }
+
     final name = result.name.isNotEmpty
         ? result.name
         : 'PixBar-${result.id.replaceAll(':', '').substring(result.id.replaceAll(':', '').length - 4)}';

@@ -17,40 +17,63 @@ class CtrlScreen extends StatelessWidget {
     final btns = dosJ ? juego.btns2j : juego.btns1j;
     return Scaffold(
       backgroundColor: PixBarColors.background,
-      appBar: AppBar(
-       title: Text('JUEGOS', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 12)),
-        backgroundColor: PixBarColors.background,
-        iconTheme: const IconThemeData(color: PixBarColors.grey2),
-//        actions: [
-//          TextButton(
-//            onPressed: () {
-//              context.read<BleService>().cmd(5);
-//              Navigator.of(context).popUntil((r) => r.isFirst);
-//            },
-//            child: Text('MENÚ', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 11)),
-//          ),
-//        ],
 
-actions: [
-          Selector<BleManager, bool>(
-            selector: (_, m) => m.activeState.mute,
-            builder: (_, muted, __) => IconButton(
-              onPressed: () => context.read<BleManager>().activeTarget?.cmd(PixBarCmd.mute),
-              icon: Text(
-                muted ? '🔇' : '🔊',
-                style: const TextStyle(fontSize: 18),
-              ),
-            ),
+appBar: AppBar(
+  title: Text(juego.nombre, style: PixBarText.mono.copyWith(
+    color: PixBarColors.cyan, fontSize: 12)),
+  backgroundColor: PixBarColors.background,
+  iconTheme: const IconThemeData(color: PixBarColors.grey2),
+  actions: [
+    Selector<BleManager, bool>(
+      selector: (_, m) => m.activeState.mute,
+      builder: (_, muted, __) => GestureDetector(
+        onTap: () => context.read<BleManager>().activeTarget?.cmd(PixBarCmd.mute),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: muted ? const Color(0xFF1A0A0A) : PixBarColors.panel2,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: muted ? PixBarColors.magenta : PixBarColors.border),
           ),
-          TextButton(
-            onPressed: () {
-              context.read<BleManager>().activeTarget?.cmd(5);
-              Navigator.of(context).popUntil((r) => r.isFirst);
-            },
-            child: Text('MENÚ', style: PixBarText.mono.copyWith(color: PixBarColors.cyan, fontSize: 11)),
-          ),
-        ],
+          child: Row(children: [
+            Text(muted ? '🔇' : '🔊',
+              style: const TextStyle(fontSize: 12)),
+            const SizedBox(width: 4),
+            Text(muted ? 'UNMUTE' : 'MUTE',
+              style: PixBarText.mono.copyWith(
+                fontSize: 9,
+                color: muted ? PixBarColors.magenta : PixBarColors.grey2)),
+          ]),
+        ),
       ),
+    ),
+    const SizedBox(width: 8),
+    GestureDetector(
+      onTap: () {
+        context.read<BleManager>().activeTarget?.cmd(5);
+        Navigator.of(context).popUntil((r) => r.isFirst);
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: PixBarColors.panel2,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: PixBarColors.border),
+        ),
+        child: Center(
+          child: Text('MENÚ',
+            style: PixBarText.mono.copyWith(
+              fontSize: 9, color: PixBarColors.cyan)),
+        ),
+      ),
+    ),
+    const SizedBox(width: 8),
+  ],
+),
+
       body: Column(
         children: [
           // Info

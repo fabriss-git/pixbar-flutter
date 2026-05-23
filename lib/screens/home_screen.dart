@@ -26,7 +26,8 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _Header(mgr: mgr),
+            //_Header(mgr: mgr),
+            _Header(mgr: mgr, apagado: apagado),
             _InfoStrip(state: state),
             Expanded(
               child: SingleChildScrollView(
@@ -116,7 +117,8 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
-            _BrilloBar(mgr: mgr),
+            //_BrilloBar(mgr: mgr),
+            _BrilloBar(mgr: mgr, apagado: apagado),
           ],
         ),
       ),
@@ -127,7 +129,9 @@ class HomeScreen extends StatelessWidget {
 // ── Header ──
 class _Header extends StatelessWidget {
   final BleManager mgr;
-  const _Header({required this.mgr});
+  //const _Header({required this.mgr});
+  final bool apagado;  // ← agregar
+  const _Header({required this.mgr, required this.apagado}); 
 
   @override
   Widget build(BuildContext context) {
@@ -149,32 +153,36 @@ class _Header extends StatelessWidget {
             children: [
               const PixBarLogo(size: 'small'),
 
-              // Mute
-              SizedBox(
-              height: 30,
-              child: GestureDetector(
-                onTap: () => target?.cmd(PixBarCmd.mute),
-                child: Container(
-                  //padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                  decoration: BoxDecoration(
-                    color: muted ? const Color(0xFF1A0A0A) : PixBarColors.panel2,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: muted ? PixBarColors.magenta : PixBarColors.border),
-                  ),
-                  child: Row(children: [
-                    Text(muted ? '🔇' : '🔊', style: const TextStyle(fontSize: 12)),
-                    const SizedBox(width: 4),
-                    Text(muted ? 'UNMUTE' : 'MUTE',
-                      style: PixBarText.mono.copyWith(
-                        fontSize: 9,
-                        color: muted ? PixBarColors.magenta : PixBarColors.grey2)),
-                  ]),
-                ),
-              ),
-              ),
-
+   // Mute
+SizedBox(
+  height: 30,
+  child: Opacity(
+    opacity: apagado ? 0.3 : 1.0,
+    child: IgnorePointer(
+      ignoring: apagado,
+      child: GestureDetector(
+        onTap: () => target?.cmd(PixBarCmd.mute),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+          decoration: BoxDecoration(
+            color: muted ? const Color(0xFF1A0A0A) : PixBarColors.panel2,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: muted ? PixBarColors.magenta : PixBarColors.border),
+          ),
+          child: Row(children: [
+            Text(muted ? '🔇' : '🔊', style: const TextStyle(fontSize: 12)),
+            const SizedBox(width: 4),
+            Text(muted ? 'UNMUTE' : 'MUTE',
+              style: PixBarText.mono.copyWith(
+                fontSize: 9,
+                color: muted ? PixBarColors.magenta : PixBarColors.grey2)),
+          ]),
+        ),
+      ),
+    ),
+  ),
+),
 
               // Power
               SizedBox(
@@ -365,7 +373,9 @@ class _FiestaBtn extends StatelessWidget {
 
 class _BrilloBar extends StatefulWidget {
   final BleManager mgr;
-  const _BrilloBar({required this.mgr});
+  //const _BrilloBar({required this.mgr});
+  final bool apagado;  // ← agregar
+  const _BrilloBar({required this.mgr, required this.apagado});
 
   @override
   State<_BrilloBar> createState() => _BrilloBarState();
@@ -376,33 +386,39 @@ class _BrilloBarState extends State<_BrilloBar> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: PixBarColors.panel,
-        border: Border(top: BorderSide(color: PixBarColors.border)),
-      ),
-      child: Row(children: [
-        const Text('🔅', style: TextStyle(fontSize: 14)),
-        Expanded(
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: PixBarColors.cyan,
-              inactiveTrackColor: PixBarColors.border,
-              thumbColor: PixBarColors.cyan,
-              overlayColor: PixBarColors.cyan.withAlpha(30),
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-              trackHeight: 4,
-            ),
-            child: Slider(
-              value: _valor, min: 0, max: 1,
-              onChanged: (v) => setState(() => _valor = v),
-              onChangeEnd: (v) => widget.mgr.activeTarget?.setBrillo(v),
+  return Opacity(
+    opacity: widget.apagado ? 0.3 : 1.0,
+    child: IgnorePointer(
+      ignoring: widget.apagado,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: const BoxDecoration(
+          color: PixBarColors.panel,
+          border: Border(top: BorderSide(color: PixBarColors.border)),
+        ),
+        child: Row(children: [
+          const Text('🔅', style: TextStyle(fontSize: 14)),
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: PixBarColors.cyan,
+                inactiveTrackColor: PixBarColors.border,
+                thumbColor: PixBarColors.cyan,
+                overlayColor: PixBarColors.cyan.withAlpha(30),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                trackHeight: 4,
+              ),
+              child: Slider(
+                value: _valor, min: 0, max: 1,
+                onChanged: (v) => setState(() => _valor = v),
+                onChangeEnd: (v) => widget.mgr.activeTarget?.setBrillo(v),
+              ),
             ),
           ),
-        ),
-        const Text('☀️', style: TextStyle(fontSize: 16)),
-      ]),
-    );
-  }
+          const Text('☀️', style: TextStyle(fontSize: 16)),
+        ]),
+      ),
+    ),
+  );
+}
 }

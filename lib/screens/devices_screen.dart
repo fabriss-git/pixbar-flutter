@@ -476,23 +476,33 @@ class _ScanSheetState extends State<_ScanSheet> {
                     //subtitle: Text(r.id,
                       //style: PixBarText.mono.copyWith(
                         //fontSize: 9, color: PixBarColors.grey)),
-                    trailing: isConnecting
-                      ? Text('Conectando...',
-                          style: PixBarText.mono.copyWith(
-                            fontSize: 9, color: PixBarColors.cyan))
-                      : TextButton(
-                          onPressed: () async {
-                          setState(() => _connectingId = r.id);
-                          await m.connectScanResult(r);
-                          // Esperar hasta que conecte
-                          while (!m.devices.any((d) => d.id == r.id && d.connected)) {
-                          await Future.delayed(const Duration(milliseconds: 300));
-                          }
-  if (context.mounted) Navigator.pop(context);
-},
-                          child: Text('CONECTAR',
-                            style: PixBarText.mono.copyWith(
-                              fontSize: 10, color: PixBarColors.cyan))),
+                    trailing: m.devices.length >= 10
+  ? Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: PixBarColors.border),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text('LÍMITE',
+        style: PixBarText.mono.copyWith(
+          fontSize: 9, color: PixBarColors.grey)),
+    )
+  : isConnecting
+    ? Text('Conectando...',
+        style: PixBarText.mono.copyWith(
+          fontSize: 9, color: PixBarColors.cyan))
+    : TextButton(
+        onPressed: () async {
+          setState(() => _connectingId = r.id);
+          await m.connectScanResult(r);
+          while (!m.devices.any((d) => d.id == r.id && d.connected)) {
+            await Future.delayed(const Duration(milliseconds: 300));
+          }
+          if (context.mounted) Navigator.pop(context);
+        },
+        child: Text('CONECTAR',
+          style: PixBarText.mono.copyWith(
+            fontSize: 10, color: PixBarColors.cyan))),
                   );
                 }),
               const SizedBox(height: 8),
