@@ -19,6 +19,8 @@ class HomeScreen extends StatelessWidget {
     final target = mgr.activeTarget;
     final state = mgr.activeState;
     final apagado = state.modo == 15;
+    final sinConexion = !mgr.anyConnected;
+    final sinTarget = mgr.activeTarget == null;
     final esGrupo = mgr.activeTarget is GroupTarget;
 
     return Scaffold(
@@ -27,7 +29,7 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           children: [
             //_Header(mgr: mgr),
-            _Header(mgr: mgr, apagado: apagado),
+            _Header(mgr: mgr, apagado: apagado || sinConexion || sinTarget),
             _InfoStrip(state: state),
             Expanded(
               child: SingleChildScrollView(
@@ -35,9 +37,9 @@ class HomeScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     Opacity(
-                      opacity: apagado ? 0.3 : 1.0,
+                      opacity: (apagado || sinConexion || sinTarget) ? 0.3 : 1.0,
                       child: IgnorePointer(
-                        ignoring: apagado,
+                        ignoring: apagado || sinConexion || sinTarget,
                         child: GridView.count(
                           crossAxisCount: 2,
                           shrinkWrap: true,
@@ -56,9 +58,9 @@ class HomeScreen extends StatelessWidget {
                             //    MaterialPageRoute(builder: (_) => const JuegosScreen()))),
                             
                             Opacity(
-      opacity: (apagado || esGrupo) ? 0.3 : 1.0,
+      opacity: (apagado || esGrupo || sinConexion || sinTarget) ? 0.3 : 1.0,
       child: IgnorePointer(
-        ignoring: apagado || esGrupo,
+        ignoring: apagado || esGrupo || sinConexion || sinTarget,
         child: _ModoBtn(
           label: 'JUEGOS', icon: '🕹️',
           color: const Color(0xFFFF2D78),
@@ -98,9 +100,9 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: 10),
 
                     Opacity(
-                      opacity: apagado ? 0.3 : 1.0,
+                      opacity: (apagado || sinConexion || sinTarget) ? 0.3 : 1.0,
                       child: IgnorePointer(
-                        ignoring: apagado,
+                        ignoring: apagado || sinConexion || sinTarget,
                         child: _FiestaBtn(
                           onTap: () => target?.cmd(PixBarCmd.fiesta)),
                       ),
@@ -118,7 +120,7 @@ class HomeScreen extends StatelessWidget {
             ),
 
             //_BrilloBar(mgr: mgr),
-            _BrilloBar(mgr: mgr, apagado: apagado),
+            _BrilloBar(mgr: mgr, apagado: apagado || sinConexion || sinTarget),
           ],
         ),
       ),

@@ -23,14 +23,17 @@ appBar: AppBar(
     color: PixBarColors.cyan, fontSize: 12)),
   backgroundColor: PixBarColors.background,
   iconTheme: const IconThemeData(color: PixBarColors.grey2),
-  actions: [
-    Selector<BleManager, bool>(
+  
+
+actions: [
+  SizedBox(
+    height: 30,
+    child: Selector<BleManager, bool>(
       selector: (_, m) => m.activeState.mute,
       builder: (_, muted, __) => GestureDetector(
         onTap: () => context.read<BleManager>().activeTarget?.cmd(PixBarCmd.mute),
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
           decoration: BoxDecoration(
             color: muted ? const Color(0xFF1A0A0A) : PixBarColors.panel2,
             borderRadius: BorderRadius.circular(6),
@@ -38,8 +41,7 @@ appBar: AppBar(
               color: muted ? PixBarColors.magenta : PixBarColors.border),
           ),
           child: Row(children: [
-            Text(muted ? '🔇' : '🔊',
-              style: const TextStyle(fontSize: 12)),
+            Text(muted ? '🔇' : '🔊', style: const TextStyle(fontSize: 12)),
             const SizedBox(width: 4),
             Text(muted ? 'UNMUTE' : 'MUTE',
               style: PixBarText.mono.copyWith(
@@ -49,15 +51,17 @@ appBar: AppBar(
         ),
       ),
     ),
-    const SizedBox(width: 8),
-    GestureDetector(
+  ),
+  const SizedBox(width: 8),
+  SizedBox(
+    height: 30,
+    child: GestureDetector(
       onTap: () {
         context.read<BleManager>().activeTarget?.cmd(5);
         Navigator.of(context).popUntil((r) => r.isFirst);
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
         decoration: BoxDecoration(
           color: PixBarColors.panel2,
           borderRadius: BorderRadius.circular(6),
@@ -70,8 +74,10 @@ appBar: AppBar(
         ),
       ),
     ),
-    const SizedBox(width: 8),
-  ],
+  ),
+  const SizedBox(width: 8),
+],
+
 ),
 
       body: Column(
@@ -85,7 +91,8 @@ appBar: AppBar(
           Expanded(
             child: juego.solo
               ? _SoloBtn(btn: btns.first)
-              : _CruzBtns(btns: btns),
+              //: _CruzBtns(btns: btns),
+              : _CruzBtns(btns: btns, juegoNombre: juego.nombre),
           ),
         ],
       ),
@@ -146,13 +153,73 @@ class _SoloBtn extends StatelessWidget {
 }
 
 // Cruz de botones
-class _CruzBtns extends StatelessWidget {
+class _CruzBtns extends StatefulWidget {
   final List<BtnDato> btns;
-  const _CruzBtns({required this.btns});
+  //const _CruzBtns({required this.btns});
+  final String juegoNombre;  // ← agregar
+  const _CruzBtns({required this.btns, required this.juegoNombre});
+
+  @override
+  State<_CruzBtns> createState() => _CruzBtnsState();
+}
+
+class _CruzBtnsState extends State<_CruzBtns> {
+  final Set<int> _held = {};
+  Timer? _timer;
 
   static const Map<String, List<int>> _pos = {
     'r': [2, 1], 'g': [1, 0], 'b': [0, 1], 'y': [1, 2],
   };
+
+
+void _disparo(int byte) {
+  // Pausar timer brevemente para dar paso al tiro
+  _timer?.cancel();
+  _timer = null;
+  context.read<BleManager>().activeTarget?.cmd(byte);
+  // Reiniciar timer después de 50ms
+  Future.delayed(const Duration(milliseconds: 50), () {
+    if (mounted && _held.isNotEmpty) _startTimer();
+  });
+}
+
+  void _press(int byte) {
+    _held.add(byte);
+    _startTimer();
+  }
+
+  void _release(int byte) {
+    _held.remove(byte);
+    if (_held.isEmpty) _stopTimer();
+  }
+
+void _startTimer() {
+  final interval = widget.juegoNombre == 'PIXCAPTURE' 
+    ? const Duration(milliseconds: 20)
+    : const Duration(milliseconds: 90);
+  _timer ??= Timer.periodic(interval, (_) {
+    final mgr = context.read<BleManager>();
+    for (final byte in _held) {
+      int cmdByte = byte;
+      if (widget.juegoNombre == 'PIXCAPTURE') {
+        if (byte == PixBarCmd.btnAmarillo) cmdByte = PixBarCmd.pcJ1Mover;
+        if (byte == PixBarCmd.btnVerde) cmdByte = PixBarCmd.pcJ2Mover;
+      }
+      mgr.activeTarget?.cmd(cmdByte);
+    }
+  });
+}
+
+  void _stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -166,12 +233,24 @@ class _CruzBtns extends StatelessWidget {
           children: List.generate(9, (i) {
             final col = i % 3;
             final row = i ~/ 3;
-            final btn = btns.where((b) {
+            final btn = widget.btns.where((b) {
               final p = _pos[b.color];
               return p != null && p[0] == col && p[1] == row;
             }).firstOrNull;
             if (btn == null) return const SizedBox();
-            return Center(child: _CtrlBtn(btn: btn, size: 80));
+            return Center(
+              child: _CtrlBtn(
+                btn: btn,
+                size: 80,
+                //onPress: btn.hold ? () => _press(btn.byte) : null,
+                onPress: btn.hold 
+  ? () => _press(btn.byte) 
+  : widget.juegoNombre == 'PIXCAPTURE' 
+    ? () => _disparo(btn.byte)
+    : null,
+                onRelease: btn.hold ? () => _release(btn.byte) : null,
+              ),
+            );
           }),
         ),
       ),
@@ -182,7 +261,14 @@ class _CruzBtns extends StatelessWidget {
 class _CtrlBtn extends StatefulWidget {
   final BtnDato btn;
   final double size;
-  const _CtrlBtn({required this.btn, required this.size});
+  final VoidCallback? onPress;
+  final VoidCallback? onRelease;
+  const _CtrlBtn({
+    required this.btn,
+    required this.size,
+    this.onPress,
+    this.onRelease,
+  });
 
   @override
   State<_CtrlBtn> createState() => _CtrlBtnState();
@@ -191,8 +277,7 @@ class _CtrlBtn extends StatefulWidget {
 class _CtrlBtnState extends State<_CtrlBtn> {
   bool _held = false;
   Timer? _timer;
-
-  static const Map<String, Color> _colors = {
+    static const Map<String, Color> _colors = {
     'r': Color(0xFFCC1A1A),
     'g': Color(0xFF1A7A1A),
     'b': Color(0xFF1A3AAA),
@@ -200,24 +285,28 @@ class _CtrlBtnState extends State<_CtrlBtn> {
   };
 
   void _start() {
-    //final ble = context.read<BleService>();
-    //ble.cmd(widget.btn.byte);
-    context.read<BleManager>().activeTarget?.cmd(widget.btn.byte);
-    if (widget.btn.hold) {
-      _timer = Timer.periodic(const Duration(milliseconds: 90), (_) {
-        //ble.cmd(widget.btn.byte);
-        context.read<BleManager>().activeTarget?.cmd(widget.btn.byte);
-      });
+    if (widget.onPress != null) {
+      // Timer manejado por el padre
+      widget.onPress!();
+      //context.read<BleManager>().activeTarget?.cmd(widget.btn.byte);
+    } else {
+      context.read<BleManager>().activeTarget?.cmd(widget.btn.byte);
+      if (widget.btn.hold) {
+        _timer = Timer.periodic(const Duration(milliseconds: 90), (_) {
+          context.read<BleManager>().activeTarget?.cmd(widget.btn.byte);
+        });
+      }
     }
     setState(() => _held = true);
   }
 
   void _stop() {
+    widget.onRelease?.call();
     _timer?.cancel();
     _timer = null;
     setState(() => _held = false);
   }
-
+  
   @override
   void dispose() {
     _timer?.cancel();
@@ -231,6 +320,8 @@ class _CtrlBtnState extends State<_CtrlBtn> {
       onTapDown: (_) => _start(),
       onTapUp: (_) => _stop(),
       onTapCancel: _stop,
+      //onLongPressEnd: (_) => _stop(),  // ← agregar
+      //onPanEnd: (_) => _stop(),        // ← agregar
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 80),
         width: widget.size,

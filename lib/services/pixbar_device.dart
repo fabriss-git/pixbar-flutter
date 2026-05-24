@@ -181,7 +181,7 @@ void _onStateReceived(List<int> value) {
       await _ble.writeCharacteristicWithoutResponse(_cmdChar, value: [byte]);
 
     final after = DateTime.now().millisecondsSinceEpoch;//agregado para el debug
-    //debugPrint('[$displayName] cmd 0x${byte.toRadixString(16)} tardó ${after - before}ms');//agregado para el debug
+    debugPrint('[$displayName] cmd 0x${byte.toRadixString(16)} tardó ${after - before}ms');//agregado para el debug
 
     } catch (e) {
       debugPrint('[$displayName] cmd error: $e');

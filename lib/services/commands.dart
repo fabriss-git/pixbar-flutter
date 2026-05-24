@@ -3,6 +3,10 @@
 // ============================================================
 
 class PixBarCmd {
+
+  static const int pcJ1Mover = 0x91;
+  static const int pcJ2Mover = 0x92;
+
   // UUIDs
   static const String serviceUUID  = '12345678-1234-1234-1234-123456789abc';
   static const String stateUUID    = '12345678-1234-1234-1234-123456789ab1';
