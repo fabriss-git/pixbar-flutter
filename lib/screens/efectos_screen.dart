@@ -35,8 +35,11 @@ class _EfectosScreenState extends State<EfectosScreen> {
 //          ),
 //        ],
       ),
-      body: Column(
-        children: [
+
+          body: SafeArea(
+          child: Column(
+          children: [
+
           Expanded(
             child: GridView.builder(
               padding: const EdgeInsets.all(10),
@@ -169,6 +172,7 @@ class _EfectosScreenState extends State<EfectosScreen> {
             ]),
           ),
         ],
+      ),
       ),
     );
   }

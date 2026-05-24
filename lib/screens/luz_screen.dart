@@ -49,7 +49,10 @@ class _LuzScreenState extends State<LuzScreen> {
 //          ),
 //        ],
       ),
-      body: Column(
+
+
+        body: SafeArea(
+        child: Column(
         children: [
           // Colores rápidos
           Padding(
@@ -154,6 +157,7 @@ class _LuzScreenState extends State<LuzScreen> {
             ]),
           ),
         ],
+      ),
       ),
     );
   }
