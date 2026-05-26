@@ -119,6 +119,7 @@ class PixBarState {
   final int vuModo;
   final int vuColor;
   final bool mute;
+  final bool gameOver;
 
 @override
 bool operator ==(Object other) =>
@@ -127,8 +128,10 @@ bool operator ==(Object other) =>
   other.score == score &&
   other.vidas == vidas &&
   other.mute == mute&&
+  other.gameOver == gameOver &&  // ← agregar
   other.vuColor == vuColor &&
   other.efxParam == efxParam;
+  
 
 @override
 int get hashCode => Object.hash(modo, score, vidas, mute, efxParam);
@@ -137,12 +140,14 @@ int get hashCode => Object.hash(modo, score, vidas, mute, efxParam);
     this.modo = 0, this.score = 0, this.vidas = 3,
     this.nivel = 0, this.efxParam = 5,
     this.vuModo = 0, this.vuColor = 0, this.mute = false,
+    this.gameOver = false,
   });
 
   factory PixBarState.fromJson(String raw) {
     int parse(String key) {
       final m = RegExp('"$key":(\\d+)').firstMatch(raw);
       return m != null ? int.parse(m.group(1)!) : 0;
+      
     }
     return PixBarState(
       modo:     parse('m'),
@@ -153,6 +158,8 @@ int get hashCode => Object.hash(modo, score, vidas, mute, efxParam);
       vuModo:   parse('vm'),
       vuColor:  parse('vc'),
       mute:     parse('mu') == 1,
+      gameOver: parse('go') == 1,  // ← agregar
+
     );
   }
 

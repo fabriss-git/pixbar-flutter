@@ -105,10 +105,10 @@ class _VuScreenState extends State<VuScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('COLOR', style: PixBarText.mono.copyWith(fontSize: 9, letterSpacing: 2)),
+                  Text('PARAM', style: PixBarText.mono.copyWith(fontSize: 9, letterSpacing: 2)),
                   const SizedBox(width: 12),
                   GestureDetector(
-                    onTap: () => target?.cmd(PixBarCmd.btnVerde),
+                    onTap: () => target?.cmd(PixBarCmd.btnAmarillo),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
@@ -122,15 +122,17 @@ class _VuScreenState extends State<VuScreen> {
                   ),
                   const SizedBox(width: 8),
                   Selector<BleManager, int>(
+                    
                     selector: (_, m) => m.activeState.vuColor,
                     builder: (_, color, __) => Text(
-                      '${color+1}/10',
+                    '${color+1}/${_selVu == 9 ? 7 : 10}',
+
                       style: PixBarText.mono.copyWith(fontSize: 11, color: PixBarColors.cyan),
                     ),
                   ),
                   const SizedBox(width: 8),
                   GestureDetector(
-                    onTap: () => target?.cmd(PixBarCmd.btnAmarillo),
+                    onTap: () => target?.cmd(PixBarCmd.btnVerde),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(

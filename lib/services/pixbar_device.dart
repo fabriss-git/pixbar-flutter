@@ -156,11 +156,13 @@ void _onStateReceived(List<int> value) {
   //debugPrint('[$displayName] bytes recibidos: ${value.length} — ${String.fromCharCodes(value)}'); //debur para medir MTU
   _buffer.addAll(value);
   final raw = utf8.decode(_buffer, allowMalformed: true);
+  //debugPrint('[$displayName] estado: $raw');  // ← temporario
   if (!raw.contains('{') || !raw.contains('}')) return; // esperar JSON completo
   _buffer.clear();
   try {
     //debugPrint('[$displayName] JSON completo: $raw');//debug para medir MTU
     final newState = PixBarState.fromJson(raw);
+    //debugPrint('[$displayName] gameOver: ${newState.gameOver}'); // ← temporario
     if (newState != _state) {
       _state = newState;
       notifyListeners();
@@ -181,10 +183,10 @@ void _onStateReceived(List<int> value) {
       await _ble.writeCharacteristicWithoutResponse(_cmdChar, value: [byte]);
 
     final after = DateTime.now().millisecondsSinceEpoch;//agregado para el debug
-    debugPrint('[$displayName] cmd 0x${byte.toRadixString(16)} tardó ${after - before}ms');//agregado para el debug
+    //debugPrint('[$displayName] cmd 0x${byte.toRadixString(16)} tardó ${after - before}ms');//agregado para el debug
 
     } catch (e) {
-      debugPrint('[$displayName] cmd error: $e');
+      //debugPrint('[$displayName] cmd error: $e');
     }
   }
 
@@ -193,7 +195,7 @@ void _onStateReceived(List<int> value) {
     try {
       await _ble.writeCharacteristicWithResponse(_cmdChar, value: bytes);
     } catch (e) {
-      debugPrint('[$displayName] cmdBytes error: $e');
+      //debugPrint('[$displayName] cmdBytes error: $e');
     }
   }
 
